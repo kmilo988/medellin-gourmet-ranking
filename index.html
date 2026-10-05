@@ -726,13 +726,15 @@ document.querySelectorAll('dialog').forEach(d=>{
 });
 
 // ---------- ¿A dónde voy ahora? ----------
+// radio de búsqueda: 3 km por el tráfico de Medellín
+const RADIO_KM=3;
 const nowDlg=document.getElementById('nowDlg'),nowIn=document.getElementById('nowIn');
 document.getElementById('nowCta').addEventListener('click',()=>{locate().then(showNow,showNow);});
 function showNow(){
   // abiertos con al menos 45 min por delante; si hay ubicación, se penaliza la distancia
   let c=R.map(r=>({r,st:openState(r)})).filter(x=>x.st&&x.st.open&&x.st.left>=45);
   let radio=null;
-  if(ME){const near=c.filter(x=>x.r._d<=4);if(near.length>=3){c=near;radio=4;}}
+  if(ME){const near=c.filter(x=>x.r._d<=RADIO_KM);if(near.length>=3){c=near;radio=RADIO_KM;}}
   // puntaje menos 4 puntos por km: un restaurante 2 km más lejos necesita 8 puntos más para quedar arriba
   const key=x=>x.r._score-(ME&&isFinite(x.r._d)?4*x.r._d:0);
   c.sort((a,b)=>key(b)-key(a));
@@ -742,7 +744,7 @@ function showNow(){
     const next=R.map(r=>({r,st:openState(r)})).filter(x=>x.st&&!x.st.open&&x.st.opens!=null).sort((a,b)=>a.st.inDays-b.st.inDays||a.st.opens-b.st.opens||b.r._score-a.r._score).slice(0,3);
     h+=`<p class="now-empty">No hay restaurantes del festival abiertos en este momento.${next.length?` El primero en abrir ${opensTxt(next[0].st)}.`:''}</p>`;
   }else{
-    h+=`<p class="now-empty" style="padding:4px 0 0">${ME?(radio?`Abiertos a menos de ${radio} km de ti, con mejor puntaje.`:'Abiertos y con mejor puntaje; no hay 3 opciones a menos de 4 km, así que ampliamos la búsqueda.'):'Abiertos ahora y con mejor puntaje. Activa tu ubicación para ver los más cercanos.'}</p>`;
+    h+=`<p class="now-empty" style="padding:4px 0 0">${ME?(radio?`Abiertos a menos de ${radio} km de ti, con mejor puntaje.`:'Abiertos y con mejor puntaje; no hay 3 opciones a menos de ${RADIO_KM} km, así que ampliamos la búsqueda.'):'Abiertos ahora y con mejor puntaje. Activa tu ubicación para ver los más cercanos.'}</p>`;
     h+=top.map((x,i)=>{const r=x.r,sd=(r.sd||[])[r._near>=0?r._near:0]||{lat:r.lat,lng:r.lng,dir:r.dir};
       const gm=sd.lat!=null?`https://www.google.com/maps/dir/?api=1&destination=${sd.lat},${sd.lng}`:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.n+' '+(sd.dir||''))}`;
       const wz=sd.lat!=null?`https://waze.com/ul?ll=${sd.lat},${sd.lng}&navigate=yes`:`https://waze.com/ul?q=${encodeURIComponent(sd.dir||r.n)}&navigate=yes`;

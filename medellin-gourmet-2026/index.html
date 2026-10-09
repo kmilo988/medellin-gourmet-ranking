@@ -894,7 +894,7 @@ dIn.addEventListener('click',e=>{
   }else if(e.target.closest('[data-share-copy]')){track('copiar-enlace/'+DR._slug,DR.n);copyLink(DR);}
   else if(e.target.closest('[data-ruta]')){const v=e.target.closest('[data-ruta]').dataset.ruta;setRuta(DR,v);document.getElementById('rutaRow').innerHTML=rutaBtns(DR);
     toast(RUTA[DR._slug]?(v==='q'?'Agregado a tu ruta':'¡Bien! Ponle tu nota para armar tu top'):'Quitado de tu ruta');if(!rutaN())S.ruta=false;renderChips();render();}
-  else if(e.target.closest('[data-nota]')){setNota(DR,+e.target.closest('[data-nota]').dataset.nota);document.getElementById('rutaRow').innerHTML=rutaBtns(DR);track('nota/'+DR._slug,DR.n);render();}
+  else if(e.target.closest('[data-nota]')){setNota(DR,+e.target.closest('[data-nota]').dataset.nota);document.getElementById('rutaRow').innerHTML=rutaBtns(DR);track(`nota/${NOTAS[DR._slug]}/${DR._slug}`,`${DR.n} · ${NOTAS[DR._slug]}★`);render();}
   else if(e.target.closest('[data-cn]')){CALC.n=Math.max(1,Math.min(20,CALC.n+(+e.target.closest('[data-cn]').dataset.cn)));renderCalc();}
   else if(e.target.closest('[data-tip]')){CALC.tip=!CALC.tip;renderCalc();}
   else if(e.target.closest('[data-beb]')){CALC.beb=+e.target.closest('[data-beb]').dataset.beb;renderCalc();}
@@ -1077,6 +1077,8 @@ async function miTop(){
   c.toBlob(async blob=>{
     if(!blob){toast('No se pudo crear la imagen');return;}
     track('mi-top');
+    // puestos del top de cada comensal: base del "ranking de los comensales" al cierre
+    top.forEach((r,i)=>track(`top/${i+1}/${r._slug}`,`${r.n} · puesto ${i+1}`));
     const file=new File([blob],'mi-top-medellin-gourmet-2026.png',{type:'image/png'});
     const txt=`🏆 Mi top de Medellín Gourmet 2026. Arma el tuyo: ${location.origin}${location.pathname}`;
     try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],text:txt});return;}}catch(err){if(err&&err.name==='AbortError')return;}

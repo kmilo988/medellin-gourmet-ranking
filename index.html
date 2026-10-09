@@ -291,6 +291,16 @@ dialog.detail .sheet-in{max-height:92dvh}
 .act{display:flex;align-items:center;justify-content:center;gap:8px;height:48px;border-radius:12px;font-weight:700;text-decoration:none;font-size:14.5px;border:1.5px solid var(--ink)}
 .act.primary{background:var(--forest);border-color:var(--forest);color:var(--forest-ink)}
 .act.wa{background:#1f9d55;border-color:#1f9d55;color:#fff}
+/* Compartir: botón en la cabecera de la ficha y bloque al final */
+.share-top{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-radius:99px;background:var(--orchid);color:#fff;font-weight:700;font-size:13.5px;margin-top:6px;margin-left:auto}
+.share-top+.close{margin-left:8px}
+.share-top svg{width:16px;height:16px}
+.share-box{margin-top:22px;padding:14px;border-radius:12px;background:var(--orchid-soft);display:grid;gap:10px}
+.share-box p{font-size:13.5px;color:var(--ink)}
+.share-box p b{font-weight:700}
+.share-box .actions{margin-top:0}
+.act.copy-link{background:var(--paper);border-color:var(--orchid);color:var(--orchid)}
+.shared-note{background:var(--orchid-soft);color:var(--ink);border-radius:10px;padding:9px 12px;font-size:13.5px;margin-bottom:4px}
 
 /* Hoja de filtros */
 .f-group{margin-top:18px}
@@ -411,7 +421,7 @@ function calcScore(r){
   const sCa=(r.cs.length/5)*100;
   return{total:W.rg*sRg+W.ah*sAh+W.nrg*sNrg+W.va*sVa+W.ca*sCa,sRg,sAh,sNrg,sVa,sCa};
 }
-R.forEach((r,i)=>{r._id=i;r._s=calcScore(r);r._score=r._s.total;
+R.forEach((r,i)=>{r._id=i;r._slug=(r.u||'').replace(/\/+$/,'').split('/').pop()||String(i);r._s=calcScore(r);r._score=r._s.total;
   r._hay=[r.n,r.tc,r.z,r.dir,...r.pl.map(p=>p.n+' '+(p.d||''))].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');});
 // puesto global por puntaje (no cambia con filtros)
 [...R].sort((a,b)=>b._score-a._score).forEach((r,i)=>r._rank=i+1);
@@ -643,16 +653,19 @@ function weekHtml(r){
   const t=nowCol().dow;
   return`<div class="week">${DIAS.map((d,i)=>`<span class="${i===t?'today':''}">${d}</span><span class="${i===t?'today':''}">${r.oh[i].length?r.oh[i].map(([a,b])=>`${hhmm(a)} – ${hhmm(b)}`).join(' · '):'Sin servicio'}</span>`).join('')}</div>`;
 }
-function openDetail(r){
+function openDetail(r,shared){
+  DR=r;
   const s=r._s;
   const bd=[['Google',s.sRg,W.rg],['Ahorro',s.sAh,W.ah],['Popularidad',s.sNrg,W.nrg],['Variedad',s.sVa,W.va],['Extras',s.sCa,W.ca]];
   const mn=r.mn.length?r.mn:r.ps.map(p=>({p,a:0,ah:0}));
   const sel=S.price&&mn.some(m=>m.p===S.price)?S.price:mn[0].p;
+  DM=sel;
   const tel=(r.tel||'').replace(/\D/g,'');
   const sedes=(r.sd&&r.sd.length?r.sd:[{nm:'',dir:r.dir,lat:r.lat,lng:r.lng}]).map((x,i)=>({...x,i,d:ME&&x.lat!=null?km(ME.lat,ME.lng,x.lat,x.lng):null}));
   if(ME)sedes.sort((a,b)=>(a.d??1e9)-(b.d??1e9));
   dIn.innerHTML=`
-    <div class="grab"><button class="close" type="button" data-close aria-label="Cerrar">×</button></div>
+    <div class="grab"><button class="share-top" type="button" data-share aria-label="Compartir ${esc(r.n)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>Compartir</button><button class="close" type="button" data-close aria-label="Cerrar">×</button></div>
+    ${shared?'<div class="shared-note">📩 <b>Te recomendaron este restaurante.</b> Mira el menú y cómo llegar; al cerrar ves el ranking completo.</div>':''}
     <div class="d-head">
       <div class="d-rank">Puesto ${r._rank} de ${R.length} · ${r._score.toFixed(1)} pts</div>
       <h3 id="dName">${esc(r.n)}</h3>
@@ -689,17 +702,54 @@ function openDetail(r){
       ${r.wa?`<a class="act wa" href="${esc(r.wa)}" target="_blank" rel="noopener">WhatsApp</a>`:''}
       ${r.ig?`<a class="act" href="${esc(r.ig)}" target="_blank" rel="noopener">Instagram</a>`:''}
       ${r.u?`<a class="act" href="${esc(r.u)}" target="_blank" rel="noopener">Ficha oficial</a>`:''}
+    </div>
+    <div class="share-box">
+      <p><b>¿Se lo recomiendas a alguien?</b> Le llega con el menú, el precio y cómo llegar.</p>
+      <div class="actions"><a class="act wa" href="#" data-share-wa>Enviar por WhatsApp</a><button class="act copy-link" type="button" data-share-copy>Copiar enlace</button></div>
     </div>`;
   dIn.querySelector('.menu-tabs').addEventListener('click',e=>{
     const b=e.target.closest('.menu-tab');if(!b)return;
     dIn.querySelectorAll('.menu-tab').forEach(x=>x.setAttribute('aria-selected',x===b));
-    document.getElementById('menuPanel').innerHTML=menuPanel(r,mn.find(m=>m.p===+b.dataset.mp));
+    DM=+b.dataset.mp;
+    document.getElementById('menuPanel').innerHTML=menuPanel(r,mn.find(m=>m.p===DM));
   });
   const la=dIn.querySelector('[data-locate]');
   if(la)la.addEventListener('click',()=>locate().then(()=>{openDetail(r);render();}).catch(()=>{}));
+  setShareUrl(r);
   if(!dDlg.open)dDlg.showModal();
   dIn.scrollTop=0;
 }
+// ---------- Compartir un restaurante ----------
+// enlace directo: ?r=<slug> abre la ficha del restaurante al cargar la página
+let DR=null,DM=null;
+const shareUrl=r=>`${location.origin}${location.pathname}?r=${encodeURIComponent(r._slug)}`;
+function setShareUrl(r){try{history.replaceState(null,'',r?shareUrl(r):location.pathname);}catch(e){}}
+dDlg.addEventListener('close',()=>{DR=null;setShareUrl(null);});
+// mensaje listo para enviar: lo esencial para decidir sin abrir el enlace
+function shareText(r){
+  const mn=r.mn.length?r.mn:r.ps.map(p=>({p,a:0}));
+  const m=mn.find(x=>x.p===DM)||mn[0];
+  const l=[`🍽️ *${r.n}* · Medellín Gourmet`];
+  if(r.rg>0)l.push(`★ ${r.rg.toFixed(1)} en Google (${r.nrg.toLocaleString('es-CO')} reseñas)`);
+  if(m)l.push(`Menú para dos: ${fmt(m.p)}${m.a>m.p?` · ahorras ${Math.round((1-m.p/m.a)*100)}%`:''}`);
+  if(r.zs.length)l.push(`📍 ${r.zs.join(' · ')}`);
+  return l.join('\n');
+}
+function copyLink(r){
+  const t=`${shareText(r)}\n${shareUrl(r)}`;
+  try{navigator.clipboard.writeText(t).then(()=>toast('Enlace copiado, pégalo donde quieras'),()=>toast('No se pudo copiar'));}catch(e){toast('No se pudo copiar');}
+}
+dIn.addEventListener('click',e=>{
+  if(!DR)return;
+  if(e.target.closest('[data-share]')){
+    // en el celular abre el menú nativo (WhatsApp, Instagram, SMS…); en computador copia el enlace
+    if(navigator.share)navigator.share({title:`${DR.n} · Medellín Gourmet`,text:shareText(DR),url:shareUrl(DR)}).catch(()=>{});
+    else copyLink(DR);
+  }else if(e.target.closest('[data-share-wa]')){
+    e.preventDefault();
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText(DR)}\n${shareUrl(DR)}`)}`,'_blank','noopener');
+  }else if(e.target.closest('[data-share-copy]'))copyLink(DR);
+});
 // enlaces de navegación: con coordenadas validadas o, si no, por dirección escrita
 function sedeHtml(r,x,closest){
   const q=encodeURIComponent(`${r.n} ${x.dir}`);
@@ -779,6 +829,11 @@ const bar=document.getElementById('bar');
 new IntersectionObserver(([e])=>bar.classList.toggle('stuck',!e.isIntersecting),{threshold:0}).observe(document.querySelector('.hero'));
 
 renderChips();render();
+(function(){
+  const slug=new URLSearchParams(location.search).get('r');if(!slug)return;
+  const r=R.find(x=>x._slug===slug);
+  if(r)openDetail(r,true);else setShareUrl(null);
+})();
 </script>
 </body>
 </html>

@@ -345,6 +345,7 @@ dialog.detail .sheet-in{max-height:92dvh}
 .calc{margin-top:12px;border:1.5px solid var(--ink);border-radius:12px;padding:12px;display:grid;gap:10px;font-size:13.5px}
 .calc-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .calc-h strong{font:400 19px/1.1 var(--f-display)}
+.calc-h .calc-reset{margin-left:0}
 .stepper{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:99px;overflow:hidden}
 .stepper button{width:36px;height:34px;font-size:18px;font-weight:700}
 .stepper span{min-width:44px;text-align:center;font-weight:700}
@@ -858,33 +859,41 @@ function rutaBtns(r){const v=RUTA[r._slug],nt=NOTAS[r._slug]||0;
   return`<div class="ruta-row"><button class="ruta-btn" type="button" data-ruta="q" aria-pressed="${v==='q'}">♡ Quiero ir</button><button class="ruta-btn" type="button" data-ruta="f" aria-pressed="${v==='f'}">✓ Ya fui</button></div>`+
     (v==='f'?`<div class="mi-nota">Tu nota:${[1,2,3,4,5].map(i=>`<button type="button" data-nota="${i}" class="${i<=nt?'on':''}" aria-label="${i} estrella${i>1?'s':''}">★</button>`).join('')}</div>`:'');}
 // ---------- ¿Cuánto paga cada uno? ----------
-// el menú es para dos: se sugiere un menú por cada dos personas, pero se puede ajustar a mano
-// (p. ej. van tres y piden un solo menú); "extra" es el valor total de lo adicional en pesos
-const CALC={n:2,tip:true,menus:null,extra:0};
+// el menú es para dos: se sugiere un menú por cada dos personas del precio seleccionado,
+// pero se puede combinar a mano por precio (p. ej. uno de $89K y uno de $119K, o tres personas con un solo menú);
+// "extra" es el valor total de lo adicional en pesos
+const CALC={n:2,tip:true,menus:null,extra:0,slug:null};
 const menusSug=()=>Math.ceil(CALC.n/2);
+const calcPrices=()=>[...new Set((DR.mn.length?DR.mn.map(m=>m.p):DR.ps))].sort((a,b)=>a-b);
+// conteo por precio: el manual si lo hay; si no, la sugerencia sobre el menú seleccionado
+const calcCounts=()=>CALC.menus||{[DM]:menusSug()};
 function calcNums(){
-  const menus=CALC.menus??menusSug(),base=menus*DM,extra=CALC.extra,tip=CALC.tip?Math.round((base+extra)*0.1/100)*100:0,tot=base+extra+tip;
-  return{menus,base,extra,tip,tot,pp:Math.ceil(tot/CALC.n/100)*100};
+  const cnt=calcCounts(),items=calcPrices().map(p=>({p,c:cnt[p]||0})).filter(x=>x.c>0);
+  const menus=items.reduce((a,x)=>a+x.c,0),base=items.reduce((a,x)=>a+x.c*x.p,0),extra=CALC.extra;
+  const tip=CALC.tip?Math.round((base+extra)*0.1/100)*100:0,tot=base+extra+tip;
+  return{items,menus,base,extra,tip,tot,pp:Math.ceil(tot/CALC.n/100)*100};
 }
+const itemTxt=(x,full)=>`${x.c} menú${x.c!==1?'s':''} de ${full?fmt(x.p):k(x.p)}`;
 function renderCalc(){
   const el=document.getElementById('calc');if(!el||!DR)return;
-  const c=calcNums();
-  el.innerHTML=`<div class="calc-h"><strong>🧮 ¿Cuánto paga cada uno?</strong></div>
+  // al cambiar de restaurante, los precios cambian: se vuelve a la sugerencia
+  if(CALC.slug!==DR._slug){CALC.slug=DR._slug;CALC.menus=null;}
+  const cnt=calcCounts(),ps=calcPrices();
+  el.innerHTML=`<div class="calc-h"><strong>🧮 ¿Cuánto paga cada uno?</strong>${CALC.menus?'<button type="button" class="calc-reset" data-cm-reset>volver a lo sugerido</button>':''}</div>
     <div class="calc-row"><span>Personas</span><span class="stepper"><button type="button" data-cn="-1" aria-label="Menos personas">−</button><span>${CALC.n}</span><button type="button" data-cn="1" aria-label="Más personas">+</button></span></div>
-    <div class="calc-row"><span>Menús de ${k(DM)}${CALC.menus!=null&&CALC.menus!==menusSug()?` <button type="button" class="calc-reset" data-cm-reset>usar ${menusSug()}</button>`:''}</span><span class="stepper"><button type="button" data-cm="-1" aria-label="Menos menús">−</button><span>${c.menus}</span><button type="button" data-cm="1" aria-label="Más menús">+</button></span></div>
+    ${ps.map(p=>`<div class="calc-row"><span>Menús de ${k(p)}</span><span class="stepper"><button type="button" data-cm="-1" data-p="${p}" aria-label="Menos menús de ${k(p)}">−</button><span>${cnt[p]||0}</span><button type="button" data-cm="1" data-p="${p}" aria-label="Más menús de ${k(p)}">+</button></span></div>`).join('')}
     <label class="calc-row" for="calcExtra"><span>Adicionales <small>(bebidas, postres…)</small></span><span class="calc-in">$<input id="calcExtra" type="text" inputmode="numeric" autocomplete="off" placeholder="0" value="${CALC.extra?CALC.extra.toLocaleString('es-CO'):''}"></span></label>
     <div class="calc-opts"><button class="chip" type="button" data-tip aria-pressed="${CALC.tip}">Servicio 10%</button></div>
     <div id="calcOut">${calcOut()}</div>`;
 }
-// solo se repinta el resultado al escribir, para no perder el foco del campo
 function calcOut(){const c=calcNums();
-  return`<div class="calc-res"><span>${c.menus} menú${c.menus!==1?'s':''} de ${k(DM)}</span><span>${fmt(c.base)}</span>
+  return`<div class="calc-res">${c.items.map(x=>`<span>${itemTxt(x)}</span><span>${fmt(x.c*x.p)}</span>`).join('')}
     ${c.extra?`<span>Adicionales</span><span>${fmt(c.extra)}</span>`:''}${c.tip?`<span>Servicio voluntario 10%</span><span>${fmt(c.tip)}</span>`:''}
     <span class="tot">Total</span><span class="tot">${fmt(c.tot)}</span></div>
     <div class="calc-pp"><span>A cada uno le toca <b>${fmt(c.pp)}</b></span>${CALC.n>1?'<button type="button" data-calc-send>Enviar al grupo</button>':''}</div>
     ${CALC.n===1&&c.menus===1?'<div class="note">El menú es para dos: si vas solo, pregunta si hay porción individual.</div>':''}`;}
 function calcText(r){const c=calcNums();
-  return`🧮 Cuenta para ${CALC.n} en *${r.n}* (Medellín Gourmet)\n${c.menus} menú${c.menus!==1?'s':''} de ${fmt(DM)}${c.extra?` + adicionales ${fmt(c.extra)}`:''}${c.tip?` + servicio ${fmt(c.tip)}`:''}\nTotal ${fmt(c.tot)} → *${fmt(c.pp)} cada uno*\n${shareUrl(r)}`;}
+  return`🧮 Cuenta para ${CALC.n} en *${r.n}* (Medellín Gourmet)\n${c.items.map(x=>itemTxt(x,1)).join(' + ')||'Sin menús'}${c.extra?` + adicionales ${fmt(c.extra)}`:''}${c.tip?` + servicio ${fmt(c.tip)}`:''}\nTotal ${fmt(c.tot)} → *${fmt(c.pp)} cada uno*\n${shareUrl(r)}`;}
 dIn.addEventListener('input',e=>{if(e.target.id!=='calcExtra')return;
   CALC.extra=+(e.target.value.replace(/\D/g,'').slice(0,9))||0;document.getElementById('calcOut').innerHTML=calcOut();});
 dIn.addEventListener('focusout',e=>{if(e.target.id==='calcExtra')e.target.value=CALC.extra?CALC.extra.toLocaleString('es-CO'):'';});
@@ -911,7 +920,8 @@ dIn.addEventListener('click',e=>{
     toast(RUTA[DR._slug]?(v==='q'?'Agregado a tu ruta':'¡Bien! Ponle tu nota para armar tu top'):'Quitado de tu ruta');if(!rutaN())S.ruta=false;renderChips();render();}
   else if(e.target.closest('[data-nota]')){setNota(DR,+e.target.closest('[data-nota]').dataset.nota);document.getElementById('rutaRow').innerHTML=rutaBtns(DR);track(`nota/${NOTAS[DR._slug]}/${DR._slug}`,`${DR.n} · ${NOTAS[DR._slug]}★`);render();}
   else if(e.target.closest('[data-cn]')){CALC.n=Math.max(1,Math.min(20,CALC.n+(+e.target.closest('[data-cn]').dataset.cn)));renderCalc();}
-  else if(e.target.closest('[data-cm]')){CALC.menus=Math.max(1,Math.min(20,calcNums().menus+(+e.target.closest('[data-cm]').dataset.cm)));renderCalc();}
+  else if(e.target.closest('[data-cm]')){const b=e.target.closest('[data-cm]'),p=+b.dataset.p;
+    CALC.menus={...calcCounts()};CALC.menus[p]=Math.max(0,Math.min(20,(CALC.menus[p]||0)+(+b.dataset.cm)));renderCalc();}
   else if(e.target.closest('[data-cm-reset]')){CALC.menus=null;renderCalc();}
   else if(e.target.closest('[data-tip]')){CALC.tip=!CALC.tip;renderCalc();}
   else if(e.target.closest('[data-calc-send]')){track('calculadora/'+DR._slug,DR.n);

@@ -392,6 +392,8 @@ dialog.detail .sheet-in{max-height:92dvh}
 .report{display:block;margin:16px auto 0;font-size:12.5px;color:var(--muted);text-decoration:underline}
 .shared-list{display:flex;justify-content:space-between;gap:10px;align-items:center;background:var(--orchid-soft);border-radius:12px;padding:10px 12px;margin:14px 0 12px;font-size:13.5px}
 .shared-list span{flex:1}
+.choice.only{color:var(--orchid)}
+.sede-mn{font:600 12.5px/1.3 var(--f-mono);color:var(--orchid)}
 .shared-list button{font-weight:700;color:var(--orchid);white-space:nowrap}
 
 /* Hoja de filtros */
@@ -533,6 +535,24 @@ function calcScore(r){
   const sCa=(r.cs.length/5)*100;
   return{total:W.rg*sRg+W.ah*sAh+W.nrg*sNrg+W.va*sVa+W.ca*sCa,sRg,sAh,sNrg,sVa,sCa};
 }
+// algunos restaurantes publican como "plato" la aclaración de en qué sedes está cada menú
+// (p. ej. "Menú disponible para nuestras sedes Viva Envigado y Laureles"): se convierte en m.sedes
+// y se saca de la lista de platos para no contarla ni mostrarla como plato
+const SEDE_RE=/^men[uú] disponible para (todas )?(nuestras )?sedes:?\s*/i;
+R.forEach(r=>{
+  const fake=r.pl.filter(p=>SEDE_RE.test(p.n));if(!fake.length)return;
+  fake.forEach(p=>{
+    const m=r.mn.find(x=>x.p===p.m);if(!m||m.sedes)return;
+    if(/todas/i.test(p.n))return;
+    const txt=(p.n.replace(SEDE_RE,'')||p.d||'').trim();
+    const names=txt.split(/\s*,\s*|\s+y\s+/).map(x=>x.trim()).filter(Boolean);
+    if(names.length)m.sedes=names;
+  });
+  r.pl=r.pl.filter(p=>!SEDE_RE.test(p.n));r.np=r.pl.length;
+});
+// ¿la sede ofrece este menú? (sin restricción publicada = sí)
+const sedeTiene=(m,nm)=>!m.sedes||m.sedes.some(x=>x.toLowerCase()===String(nm||'').toLowerCase());
+const sedesTxt=a=>a.length>1?a.slice(0,-1).join(', ')+' y '+a[a.length-1]:a[0];
 R.forEach((r,i)=>{r._id=i;r._slug=(r.u||'').replace(/\/+$/,'').split('/').pop()||String(i);r._s=calcScore(r);r._score=r._s.total;
   r._veg=r.mn.some(m=>m.cm&4);r._park=r.cs.includes('Parqueadero');
   r._hay=[r.n,r.tc,r.z,r.dir,...r.cs,r._veg?'vegetariano':'',...r.pl.map(p=>p.n+' '+(p.d||''))].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');});
@@ -817,7 +837,8 @@ function menuPanel(r,m){
   const cats=[...ORDER.filter(c=>by[c]),...Object.keys(by).filter(c=>!ORDER.includes(c))];
   const pick={Entrada:'elige 1',Fuerte:'elige 2',Postre:'elige 1'};
   const k=[];if(m.cm&1)k.push('🥩 carne');if(m.cm&2)k.push('🐟 mar');if(m.cm&4)k.push('🌱 vegetariano');
-  const choice=m.nf?`<div class="choice">${m.nf} platos fuertes para elegir${k.length?' · '+k.join(' · '):''}</div>`:'';
+  const choice=(m.nf?`<div class="choice">${m.nf} platos fuertes para elegir${k.length?' · '+k.join(' · '):''}</div>`:'')+
+    (m.sedes?`<div class="choice only">📍 Solo en las sedes ${esc(sedesTxt(m.sedes))}</div>`:'');
   return`${choice}<div class="ticket"><div class="ticket-top"><strong>Menú ${fmt(m.p)}</strong>${m.a?`<span class="was">antes <s>${fmt(m.a)}</s> · ahorras ${fmt(m.a-m.p)}</span>`:'<span class="was">sin precio de referencia</span>'}</div>
     ${cats.map(c=>`<div class="course"><h4>${esc(c)}${by[c].length>1&&pick[c]?`<span class="choose">· ${pick[c]}</span>`:''}</h4>${by[c].map(p=>`<div class="dish"><b>${esc(p.n)}</b>${p.d?`<p>${esc(p.d)}</p>`:''}</div>`).join('')}</div>`).join('')}</div>`;
 }
@@ -843,13 +864,13 @@ function callNum(r){const t=(r.tel||'').replace(/\D/g,'');if(t.length>=7)return 
   const w=(r.wa||'').match(/(?:wa\.me\/|phone=)(\d{10,13})/);return w?'+'+w[1]:'';}
 // lo práctico primero: menú más barato y total para dos, horario de hoy, parqueadero y contacto
 function pracHtml(r,mn){
-  const lo=Math.min(...mn.map(m=>m.p)),tot=lo+Math.round(lo*0.1/100)*100;
+  const lo=Math.min(...mn.map(m=>m.p)),tot=lo+Math.round(lo*0.1/100)*100,loM=mn.find(m=>m.p===lo);
   const st=openState(r),hoy=r.oh&&r.oh[nowCol().dow];
   const hrs=hoy&&hoy.length?`Hoy ${hoursOn(r,nowCol().dow).replace(/–/g,' – ')}`:st?'Hoy sin servicio':'';
   const est=!st?'<span>Horario no publicado</span>':st.open?`<span class="ok">Abierto ahora</span>${st.left<=60?` · cierra en ${st.left} min`:''}`:`<span class="no">Cerrado ahora</span>${opensTxt(st)?' · '+opensTxt(st):''}`;
   const tel=callNum(r);
   return`<div class="prac">
-    <div class="prac-row"><span>💵</span><span>Desde <b class="mono">${fmt(lo)}</b> el menú para dos<small>${fmt(tot)} con servicio del 10 %${mn.length>1?` · ${mn.length} menús`:''}</small></span></div>
+    <div class="prac-row"><span>💵</span><span>Desde <b class="mono">${fmt(lo)}</b> el menú para dos<small>${fmt(tot)} con servicio del 10 %${mn.length>1?` · ${mn.length} menús`:''}${loM&&loM.sedes?` · solo en ${esc(sedesTxt(loM.sedes))}`:''}</small></span></div>
     <div class="prac-row"><span>🕒</span><span>${est}${hrs?`<small>${hrs}</small>`:''}</span></div>
     <div class="prac-row"><span>🅿️</span><span>${r._park?'<span class="ok">Tiene parqueadero</span>':'Sin parqueadero propio reportado'}</span></div>
     ${tel||r.wa?`<div class="prac-acts">${tel?`<a href="tel:${tel}" data-ev="llamar/${esc(r._slug)}">📞 Llamar</a>`:''}${r.wa?`<a class="wa" href="${esc(r.wa)}" target="_blank" rel="noopener" data-ev="restaurante-wa/${esc(r._slug)}">WhatsApp</a>`:''}</div>`:''}
@@ -1050,6 +1071,7 @@ function sedeHtml(r,x,closest){
   return`<div class="sede${closest?' closest':''}">
     <div class="sede-h"><b>${closest?'⭐ ':''}${esc(x.nm||'Sede')}</b>${x.d!=null?`<span class="km">${kmTxt(x.d)}</span>`:''}</div>
     <div class="sede-dir">${esc(x.dir)}</div>
+    ${r.mn.some(m=>m.sedes)?`<div class="sede-mn">Menús: ${r.mn.filter(m=>sedeTiene(m,x.nm)).map(m=>k(m.p)).join(' · ')||'consultar'}</div>`:''}
     <div class="nav${ub?' n3':''}"><a class="gm" href="${gm}" target="_blank" rel="noopener" data-ev="como-llegar/${esc(r._slug)}">${ub?'Maps':'Google Maps'}</a><a class="wz" href="${wz}" target="_blank" rel="noopener" data-ev="como-llegar/${esc(r._slug)}">Waze</a>${ub?`<a class="ub" href="${esc(ub)}" target="_blank" rel="noopener" data-ev="uber/${esc(r._slug)}">Uber</a>`:''}</div>
   </div>`;
 }

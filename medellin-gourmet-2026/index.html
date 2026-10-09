@@ -395,7 +395,7 @@ dialog.detail .sheet-in{max-height:92dvh}
       <div class="hero-stats" id="heroStats"></div>
     </div>
     <div class="credits"><a class="credit" data-ev="clic-linkedin" href="https://www.linkedin.com/in/jcquinterocardona/" target="_blank" rel="noopener">Ranking por Juan Camilo Quintero Cardona</a><a class="credit" data-ev="clic-gecofiin" href="https://gecofiin.com/?utm_source=medellin-gourmet-ranking&amp;utm_medium=referral" target="_blank" rel="noopener">Hecho con IA por GECOFIIN</a></div>
-    <button class="indep" type="button" id="aboutBtn"><b>No oficial</b> · independiente · nadie pagó por su puesto · <u>cómo se calcula</u></button>
+    <button class="indep" type="button" id="aboutBtn"><b>Proyecto personal</b> · no oficial · ningún restaurante pagó · <u>cómo se calcula</u></button>
   </div>
 </header>
 
@@ -452,7 +452,7 @@ dialog.detail .sheet-in{max-height:92dvh}
   </div>
   <div class="grid" id="grid"></div>
   <footer class="foot">
-    <div><b>Cómo se calcula el puntaje.</b> Google 35% · Ahorro 25% · Popularidad en Google 15% · Variedad de platos 15% · Extras del local 5%.</div>
+    <div><b>Cómo se calcula el puntaje.</b> Google 40% · Ahorro 25% · Popularidad en Google 15% · Variedad de platos 15% · Extras del local 5%.</div>
     <div id="footNote"></div>
     <div>Datos de medellingourmet.com y Google Maps, consultados el 4 de octubre de 2026. Precios por menú para dos personas.</div>
     <div class="foot-brand">Proyecto independiente, sin relación con la organización del festival. Creado por <a data-ev="clic-gecofiin-pie" href="https://gecofiin.com/?utm_source=medellin-gourmet-ranking&amp;utm_medium=referral" target="_blank" rel="noopener"><b>GECOFIIN</b></a> — tecnología financiera e inteligencia artificial, Medellín.</div>
@@ -487,7 +487,8 @@ if(GC_CODE){const sc=document.createElement('script');sc.async=true;sc.src='http
 function track(ev,title){try{if(window.goatcounter&&window.goatcounter.count)window.goatcounter.count({path:ev,title:title||ev,event:true});}catch(e){}}
 document.addEventListener('click',e=>{const a=e.target.closest('[data-ev]');if(a)track(a.dataset.ev);},true);
 // ---------- Configuración y puntaje ----------
-const W={rg:.35,ah:.25,nrg:.15,va:.15,ca:.05};
+// pesos: suman 100% (corrección 9 oct: Google pasó de 35% a 40%)
+const W={rg:.40,ah:.25,nrg:.15,va:.15,ca:.05};
 const R=DATA.r;
 const withG=R.filter(r=>r.rg>0);
 // promedio del festival para quienes no tienen reseñas en Google (ni castiga ni premia)
@@ -785,6 +786,7 @@ function openDetail(r,shared){
     <div class="breakdown" aria-label="Desglose del puntaje">
       ${bd.map(([l,v,w])=>`<div class="bd"><span>${l} <span class="mono" style="color:var(--muted)">${Math.round(w*100)}%</span></span><span class="bd-bar"><i style="width:${Math.min(v,100).toFixed(0)}%"></i></span><span class="mono">${Math.round(v)}</span></div>`).join('')}
       ${r.sg?`<div class="formula-note">Google usa el promedio del festival (${String(G_PROM).replace('.',',')}).</div>`:''}
+      <div class="formula-note data-asof">Datos de Google y del festival al 4 de oct 2026.</div>
     </div>
     ${detailTips(r)}
     <div class="sec-t">Menú para dos</div>
@@ -853,7 +855,7 @@ function whyHtml(r){
   if(r.nrg>=2000)pos.push(`muy popular (${r.nrg.toLocaleString('es-CO')} reseñas)`);else if(r.nrg<200)neg.push(r.sg?'aún sin reseñas en Google':'pocas reseñas en Google');
   if(r.np>=15)pos.push(`${r.np} platos para elegir`);else if(r.np<=6)neg.push('poca variedad de platos');
   if(!pos.length&&!neg.length)return'Equilibrado: sin puntos muy altos ni muy bajos.';
-  return`${pos.length?`<span class="pos">Destaca: ${pos.join(' · ')}.</span> `:''}${neg.length?`<span class="neg">Le resta: ${neg.join(' · ')}.</span>`:''}`;
+  return`${pos.length?`<span class="pos">Destaca: ${pos.join(' · ')}.</span> `:''}${neg.length?`<span class="neg">Puede mejorar en: ${neg.join(' · ')}.</span>`:''}`;
 }
 function rutaBtns(r){const v=RUTA[r._slug],nt=NOTAS[r._slug]||0;
   return`<div class="ruta-row"><button class="ruta-btn" type="button" data-ruta="q" aria-pressed="${v==='q'}">♡ Quiero ir</button><button class="ruta-btn" type="button" data-ruta="f" aria-pressed="${v==='f'}">✓ Ya fui</button></div>`+
@@ -960,12 +962,13 @@ document.getElementById('aboutBtn').addEventListener('click',()=>{
     <p><b>Proyecto independiente y no oficial.</b> No tiene relación con Medellín Gourmet ni con sus organizadores. <b>Nadie pagó por aparecer ni por su puesto.</b></p>
     <p>Cada restaurante recibe un puntaje de 0 a 100:</p>
     <ul>
-      <li><b>35% calificación en Google</b>: las estrellas que le dan sus clientes.</li>
+      <li><b>40% calificación en Google</b>: las estrellas que le dan sus clientes.</li>
       <li><b>25% ahorro real</b>: cuánto cuesta el menú del festival frente a pedir los mismos platos a la carta.</li>
       <li><b>15% popularidad</b>: número de reseñas en Google (más reseñas, más confiable la calificación).</li>
       <li><b>15% variedad</b>: cuántos platos puedes elegir.</li>
-      <li><b>5% extras</b>: parqueadero, pet friendly, terraza y similares.</li>
+      <li><b>5% extras</b>: parqueadero, pet friendly, pago con tarjeta, domicilio y servicio a la mesa.</li>
     </ul>
+    <p class="note"><b>Corrección del 9 de octubre:</b> los pesos ahora suman 100 % (Google pasó de 35 % a 40 %). El orden del Top 10 no cambió.</p>
     <p class="note">Los restaurantes sin reseñas en Google reciben el promedio del festival (${String(G_PROM).replace('.',',')}★), ni castiga ni premia. Datos de medellingourmet.com y Google Maps consultados el 4 de octubre de 2026; horarios y precios pueden cambiar, confirma con el restaurante.</p>
     ${REPORTE_URL?`<p class="note">¿Ves un error? <a href="${esc(REPORTE_URL)}" target="_blank" rel="noopener" data-ev="reporte/general">Avísanos</a> y lo corregimos.</p>`:''}
     <div class="hook"><b>¿Cómo se hizo esto?</b>Lo construyó un contador público, no un programador, trabajando con inteligencia artificial. Sin equipo de desarrollo y sin presupuesto. <a href="https://gecofiin.com/inteligencia-financiera/soy-contador-no-programador-ranking-medellin-gourmet?utm_source=medellin-gourmet-ranking&amp;utm_medium=referral&amp;utm_campaign=como-se-hizo" target="_blank" rel="noopener" data-ev="clic-articulo-como-se-hizo">Lee cómo se hizo →</a></div>`;
@@ -990,7 +993,7 @@ function showNow(){
     const next=R.map(r=>({r,st:openState(r)})).filter(x=>x.st&&!x.st.open&&x.st.opens!=null).sort((a,b)=>a.st.inDays-b.st.inDays||a.st.opens-b.st.opens||b.r._score-a.r._score).slice(0,3);
     h+=`<p class="now-empty">No hay restaurantes del festival abiertos en este momento.${next.length?` El primero en abrir ${opensTxt(next[0].st)}.`:''}</p>`;
   }else{
-    h+=`<p class="now-empty" style="padding:4px 0 0">${ME?(radio?`Abiertos a menos de ${radio} km de ti, con mejor puntaje.`:'Abiertos y con mejor puntaje; no hay 3 opciones a menos de ${RADIO_KM} km, así que ampliamos la búsqueda.'):'Abiertos ahora y con mejor puntaje. Activa tu ubicación para ver los más cercanos.'}</p>`;
+    h+=`<p class="now-empty" style="padding:4px 0 0">${ME?(radio?`Abiertos a menos de ${radio} km de ti, con mejor puntaje.`:`Abiertos y con mejor puntaje; no hay 3 opciones a menos de ${RADIO_KM} km, así que ampliamos la búsqueda.`):'Abiertos ahora y con mejor puntaje. Activa tu ubicación para ver los más cercanos.'}</p>`;
     h+=top.map((x,i)=>{const r=x.r,sd=(r.sd||[])[r._near>=0?r._near:0]||{lat:r.lat,lng:r.lng,dir:r.dir};
       const gm=sd.lat!=null?`https://www.google.com/maps/dir/?api=1&destination=${sd.lat},${sd.lng}`:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.n+' '+(sd.dir||''))}`;
       const wz=sd.lat!=null?`https://waze.com/ul?ll=${sd.lat},${sd.lng}&navigate=yes`:`https://waze.com/ul?q=${encodeURIComponent(sd.dir||r.n)}&navigate=yes`;

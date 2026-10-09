@@ -101,7 +101,8 @@ a{color:inherit}
 .chip:hover{border-color:var(--ink)}
 .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
 .chip .mono{font-weight:500}
-@media(max-width:560px){.lbl-f,.lbl-s{display:none}.btn-icon{padding:0 13px}}
+@media(max-width:560px){.lbl-s{display:none}.btn-icon{padding:0 12px}}
+@media(max-width:360px){.lbl-f{display:none}}
 .list-head select{width:auto}
 .chip-sep{flex:none;width:1px;background:var(--line);margin:6px 2px}
 
@@ -377,6 +378,7 @@ dialog.detail .sheet-in{max-height:92dvh}
 .f-reset{border:1.5px solid var(--line)}
 .f-apply{background:var(--ink);color:var(--bg)}
 .sheet-title{font:400 28px/1 var(--f-display)}
+.f-chips+.f-chips{margin-top:8px}
 
 .foot{border-top:1px solid var(--line);padding-block:22px 40px;font-size:12.5px;color:var(--muted);display:grid;gap:6px}
 .foot b{color:var(--ink);font-weight:600}
@@ -467,6 +469,8 @@ dialog.detail .sheet-in{max-height:92dvh}
 <dialog class="sheet" id="filters" aria-labelledby="fTitle">
   <div class="sheet-in">
     <div class="grab"><h3 class="sheet-title" id="fTitle">Filtros</h3><button class="close" type="button" data-close aria-label="Cerrar">×</button></div>
+    <div class="f-group" id="fDiaGroup"><h4>Abre el</h4><div class="f-chips" id="fDias"></div><div class="f-chips" id="fFranjas"></div></div>
+    <div class="f-group"><h4>Comida y servicios</h4><div class="f-chips" id="fExtras"></div></div>
     <div class="f-group"><h4>Zona</h4><div class="f-chips" id="fZonas"></div></div>
     <div class="f-group"><h4>Tipo de cocina</h4><div class="f-chips" id="fTipos"></div></div>
     <div class="f-foot"><button class="f-reset" id="fReset" type="button">Limpiar todo</button><button class="f-apply" type="button" data-close id="fApply">Ver resultados</button></div>
@@ -502,7 +506,8 @@ function calcScore(r){
   return{total:W.rg*sRg+W.ah*sAh+W.nrg*sNrg+W.va*sVa+W.ca*sCa,sRg,sAh,sNrg,sVa,sCa};
 }
 R.forEach((r,i)=>{r._id=i;r._slug=(r.u||'').replace(/\/+$/,'').split('/').pop()||String(i);r._s=calcScore(r);r._score=r._s.total;
-  r._hay=[r.n,r.tc,r.z,r.dir,...r.pl.map(p=>p.n+' '+(p.d||''))].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');});
+  r._veg=r.mn.some(m=>m.cm&4);r._park=r.cs.includes('Parqueadero');
+  r._hay=[r.n,r.tc,r.z,r.dir,...r.cs,r._veg?'vegetariano':'',...r.pl.map(p=>p.n+' '+(p.d||''))].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');});
 // puesto global por puntaje (no cambia con filtros)
 [...R].sort((a,b)=>b._score-a._score).forEach((r,i)=>r._rank=i+1);
 const HAS_NV=R.some(r=>r.nv===1);
@@ -516,7 +521,7 @@ const apTxt=ap=>{if(ap==null)return'';if(ap==='')return'Recién llegado';const[y
 const isNew=r=>r.nv===1;
 
 // ---------- Estado ----------
-const S={q:'',price:null,deb:false,sg:false,nv:false,near:false,open:false,el:false,ruta:false,lista:null,zonas:new Set(),tipos:new Set(),sort:'score'};
+const S={q:'',price:null,deb:false,sg:false,nv:false,near:false,open:false,el:false,veg:false,park:false,dia:null,franja:null,ruta:false,lista:null,zonas:new Set(),tipos:new Set(),sort:'score'};
 // ---------- Mi ruta: "quiero ir" (q) y "ya fui" (f), solo en este navegador ----------
 let RUTA={};
 try{RUTA=JSON.parse(localStorage.getItem('mg26-ruta')||'{}')||{};}catch(e){}
@@ -565,6 +570,19 @@ function openState(r){
   for(let k=0;k<7;k++){const d=(dow+k)%7;for(const[a]of r.oh[d])if(k>0||a>min)return{open:false,opens:a,inDays:k};}
   return{open:false};
 }
+// "Abre el…": día (lunes=0) y franja opcional; en franja exige al menos 1 h abierto dentro de ella
+const FRANJAS={alm:{t:'Almuerzo',h:'12–3 pm',a:720,b:900},noche:{t:'Noche',h:'7–10 pm',a:1140,b:1320}};
+const DIAS_C=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+function diaTxt(d){const h=nowCol().dow;return d===h?'Hoy':d===(h+1)%7?'Mañana':DIAS[d];}
+function opensOn(r,d,fr){
+  if(!r.oh||!r.oh[d])return false;
+  if(!fr)return r.oh[d].length>0;
+  const f=FRANJAS[fr];
+  // tramos del día y lo que sigue abierto después de medianoche desde el día anterior
+  const iv=[...r.oh[d],...r.oh[(d+6)%7].filter(x=>x[1]>1440).map(x=>[0,x[1]-1440])];
+  return iv.some(([a,b])=>Math.min(b,f.b)-Math.max(a,f.a)>=60);
+}
+const hoursOn=(r,d)=>r.oh[d].map(([a,b])=>`${hhmm(a)}–${hhmm(b)}`).join(', ');
 function opensTxt(st){if(!st||st.opens==null)return'';return st.inDays===0?`abre hoy a las ${hhmm(st.opens)}`:st.inDays===1?`abre mañana a las ${hhmm(st.opens)}`:`abre el ${DIAS[(nowCol().dow+st.inDays)%7].toLowerCase()} a las ${hhmm(st.opens)}`;}
 try{const s=localStorage.getItem('mg26-sort');if(s)S.sort=s;}catch(e){}
 
@@ -587,7 +605,10 @@ const chipsEl=document.getElementById('chips');
 function renderChips(){
   let h=`<button class="chip" type="button" data-flag="near" aria-pressed="${S.near}">📍 Cerca de mí</button>`;
   h+=`<button class="chip" type="button" data-flag="open" aria-pressed="${S.open}">🕒 Abierto ahora</button>`;
+  h+=`<button class="chip" type="button" data-dia aria-pressed="${S.dia!=null}" aria-haspopup="dialog">📅 ${S.dia!=null?diaTxt(S.dia)+(S.franja?' · '+FRANJAS[S.franja].t.toLowerCase():''):'Abre el…'}</button>`;
   h+=`<button class="chip" type="button" data-flag="el" aria-pressed="${S.el}">🍽️ Para elegir</button>`;
+  h+=`<button class="chip" type="button" data-flag="veg" aria-pressed="${S.veg}">🥗 Vegetariano</button>`;
+  h+=`<button class="chip" type="button" data-flag="park" aria-pressed="${S.park}">🅿️ Parqueadero</button>`;
   if(rutaN())h+=`<button class="chip" type="button" data-flag="ruta" aria-pressed="${S.ruta}">♡ Mi ruta <span class="mono">${rutaN()}</span></button>`;
   h+=`<span class="chip-sep" aria-hidden="true"></span>`;
   h+=PRICES.map(p=>`<button class="chip" type="button" data-price="${p}" aria-pressed="${S.price===p}"><span class="mono">${k(p)}</span>${p===209000?' con vino':''}</button>`).join('');
@@ -598,14 +619,17 @@ function renderChips(){
 }
 chipsEl.addEventListener('click',e=>{
   const b=e.target.closest('.chip');if(!b)return;
+  if(b.dataset.dia!=null){openFilterSheet(true);return;}
   if(b.dataset.price){const p=+b.dataset.price;S.price=S.price===p?null:p;}
   else if(b.dataset.flag==='near'){
     if(S.near){S.near=false;}
     else{locate().then(()=>{S.near=true;renderChips();render();window.scrollTo({top:document.querySelector('.list-head').offsetTop-90,behavior:'smooth'});}).catch(()=>{});return;}
   }
-  else S[b.dataset.flag]=!S[b.dataset.flag];
+  else{S[b.dataset.flag]=!S[b.dataset.flag];if(S[b.dataset.flag]&&FLAG_EV[b.dataset.flag])track(FLAG_EV[b.dataset.flag]);}
   renderChips();render();
 });
+
+const FLAG_EV={veg:'filtro/vegetariano',park:'filtro/parqueadero'};
 
 // ---------- Descubre ----------
 const disc=document.getElementById('discover');
@@ -631,6 +655,9 @@ function filtered(){
     if(S.nv&&!isNew(r))return false;
     if(S.open&&!(openState(r)||{}).open)return false;
     if(S.el&&!r.el)return false;
+    if(S.veg&&!r._veg)return false;
+    if(S.park&&!r._park)return false;
+    if(S.dia!=null&&!opensOn(r,S.dia,S.franja))return false;
     if(S.ruta&&!RUTA[r._slug])return false;
     if(S.lista&&!S.lista.has(r._slug))return false;
     if(S.zonas.size&&!r.zs.some(z=>S.zonas.has(z)))return false;
@@ -654,6 +681,7 @@ function filtered(){
 const grid=document.getElementById('grid');
 let current=[];
 function cardOpen(r){
+  if(S.dia!=null&&r.oh&&r.oh[S.dia].length)return`<span class="tag t-open">📅 ${DIAS_C[S.dia]} ${hoursOn(r,S.dia)}</span>`;
   const st=openState(r);if(!st)return'';
   if(st.open&&st.left<=60)return`<span class="tag t-warn">🕒 Cierra en ${st.left} min</span>`;
   if(S.open&&st.open)return`<span class="tag t-open">🕒 Hasta ${hhmm(st.closes)}</span>`;
@@ -680,18 +708,19 @@ function render(){
   current=filtered();
   const n=current.length;
   document.getElementById('count').textContent=`${n} de ${R.length} restaurantes${S.near&&ME?' · los más cercanos primero':S.nv?' · los más recientes primero':S.sort==='score'?' · ordenados por puntaje':''}`;
-  document.getElementById('listTitle').innerHTML=S.ruta?`Mi ruta${n?'<button class="ruta-share" type="button" id="rutaShare">Compartir</button><button class="ruta-share" type="button" id="miTop">🏆 Mi top</button><button class="ruta-share" type="button" id="rutaBackup">Guardar copia</button>':''}`:S.lista?'Ruta compartida':S.nv?'Lugares nuevos':(S.q||S.price||S.deb||S.sg||S.open||S.el||S.zonas.size||S.tipos.size)?'Tu selección':'El ranking';
+  document.getElementById('listTitle').innerHTML=S.ruta?`Mi ruta${n?'<button class="ruta-share" type="button" id="rutaShare">Compartir</button><button class="ruta-share" type="button" id="miTop">🏆 Mi top</button><button class="ruta-share" type="button" id="rutaBackup">Guardar copia</button>':''}`:S.lista?'Ruta compartida':S.nv?'Lugares nuevos':(S.q||S.price||S.deb||S.sg||S.open||S.el||S.veg||S.park||S.dia!=null||S.zonas.size||S.tipos.size)?'Tu selección':'El ranking';
   grid.innerHTML=n?current.map(card).join(''):`<div class="empty"><strong>Nada por aquí</strong>Ningún restaurante cumple todos los filtros.<br><button type="button" id="resetAll">Quitar filtros</button></div>`;
   // en modo descubre el orden es fijo (más recientes primero)
   document.getElementById('sortWrap').hidden=!!(S.nv||S.near);
-  const fc=S.zonas.size+S.tipos.size,fe=document.getElementById('fCount');
+  // cuenta lo que se elige en la hoja de filtros
+  const fc=sheetCount(),fe=document.getElementById('fCount');
   fe.hidden=!fc;fe.textContent=fc;
 }
 grid.addEventListener('click',e=>{
   if(e.target.id==='resetAll'){resetAll();return;}
   const c=e.target.closest('.card');if(c)openDetail(R[+c.dataset.id]);
 });
-function resetAll(){Object.assign(S,{q:'',price:null,deb:false,sg:false,nv:false,ruta:false,lista:null});document.getElementById('sharedList').hidden=true;S.zonas.clear();S.tipos.clear();
+function resetAll(){Object.assign(S,{q:'',price:null,deb:false,sg:false,nv:false,open:false,el:false,ruta:false,lista:null});clearSheet();document.getElementById('sharedList').hidden=true;
   document.getElementById('q').value='';document.getElementById('qClear').hidden=true;
   if(HAS_NV)syncDisc();
   renderChips();renderFilterSheet();render();}
@@ -705,20 +734,38 @@ sortSel.addEventListener('change',()=>{S.sort=sortSel.value;try{localStorage.set
 
 // ---------- Hoja de filtros ----------
 const fDlg=document.getElementById('filters');
+const sheetCount=()=>S.zonas.size+S.tipos.size+(S.dia!=null)+S.veg+S.park;
+function clearSheet(){S.zonas.clear();S.tipos.clear();Object.assign(S,{dia:null,franja:null,veg:false,park:false});}
 function renderFilterSheet(){
   const cnt=(key,v)=>R.filter(r=>r[key].includes(v)).length;
+  // días: hoy y mañana primero, luego el resto de la semana en orden
+  const h=nowCol().dow;
+  document.getElementById('fDias').innerHTML=[0,1,2,3,4,5,6].map(i=>(h+i)%7).map(d=>`<button class="chip" type="button" data-dia="${d}" aria-pressed="${S.dia===d}">${diaTxt(d)}</button>`).join('');
+  document.getElementById('fFranjas').innerHTML=[['','Todo el día'],...Object.entries(FRANJAS).map(([k,f])=>[k,`${f.t} <span class="mono" style="opacity:.6">${f.h}</span>`])]
+    .map(([k,t])=>`<button class="chip" type="button" data-franja="${k}" aria-pressed="${S.dia!=null&&(S.franja||'')===k}">${t}</button>`).join('');
+  document.getElementById('fExtras').innerHTML=`<button class="chip" type="button" data-x="veg" aria-pressed="${S.veg}">🥗 Menú vegetariano <span class="mono" style="opacity:.6">${R.filter(r=>r._veg).length}</span></button><button class="chip" type="button" data-x="park" aria-pressed="${S.park}">🅿️ Parqueadero <span class="mono" style="opacity:.6">${R.filter(r=>r._park).length}</span></button>`;
   document.getElementById('fZonas').innerHTML=DATA.z.map(z=>`<button class="chip" type="button" data-z="${esc(z)}" aria-pressed="${S.zonas.has(z)}">${esc(z)} <span class="mono" style="opacity:.6">${cnt('zs',z)}</span></button>`).join('');
   document.getElementById('fTipos').innerHTML=DATA.t.map(t=>`<button class="chip" type="button" data-t="${esc(t)}" aria-pressed="${S.tipos.has(t)}">${esc(t)} <span class="mono" style="opacity:.6">${cnt('ts',t)}</span></button>`).join('');
   updateApply();
 }
 function updateApply(){document.getElementById('fApply').textContent=`Ver ${filtered().length} resultados`;}
 fDlg.addEventListener('click',e=>{
+  const dy=e.target.closest('[data-dia],[data-franja],[data-x]');
+  if(dy){
+    if(dy.dataset.x){S[dy.dataset.x]=!S[dy.dataset.x];if(S[dy.dataset.x])track(FLAG_EV[dy.dataset.x]);}
+    else if(dy.dataset.dia!=null){const d=+dy.dataset.dia;S.dia=S.dia===d?null:d;if(S.dia==null)S.franja=null;}
+    // franja sin día elegido: se asume hoy
+    else{S.franja=dy.dataset.franja||null;if(S.dia==null)S.dia=nowCol().dow;}
+    if(dy.dataset.x==null&&S.dia!=null)track(`filtro/abre-el/${S.franja||'dia'}`);
+    renderFilterSheet();renderChips();render();return;}
   const b=e.target.closest('[data-z],[data-t]');
   if(b){const set=b.dataset.z!=null?S.zonas:S.tipos,v=b.dataset.z??b.dataset.t;set.has(v)?set.delete(v):set.add(v);
     b.setAttribute('aria-pressed',set.has(v));updateApply();render();}
 });
-document.getElementById('fReset').addEventListener('click',()=>{S.zonas.clear();S.tipos.clear();renderFilterSheet();render();});
-document.getElementById('openFilters').addEventListener('click',()=>{renderFilterSheet();fDlg.showModal();});
+document.getElementById('fReset').addEventListener('click',()=>{clearSheet();renderFilterSheet();renderChips();render();});
+// el chip "Abre el…" abre la hoja arriba, donde está el grupo de día y franja
+function openFilterSheet(fromDia){renderFilterSheet();fDlg.showModal();fDlg.querySelector('.sheet-in').scrollTop=0;if(fromDia)track('filtro/abre-el-selector');}
+document.getElementById('openFilters').addEventListener('click',()=>openFilterSheet(false));
 
 // ---------- Detalle ----------
 const dDlg=document.getElementById('detail'),dIn=document.getElementById('detailIn');

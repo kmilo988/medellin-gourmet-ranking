@@ -321,6 +321,10 @@ dialog.detail .sheet-in{max-height:92dvh}
 .ruta-btn{flex:1;height:40px;border-radius:10px;border:1.5px solid var(--line);font-weight:700;font-size:13.5px;background:var(--paper)}
 .ruta-btn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
 .t-ruta{background:var(--orchid-soft);color:var(--orchid)}
+.mi-nota{display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:600;margin-top:2px}
+.mi-nota button{font-size:24px;line-height:1;color:var(--line);padding:2px}
+.mi-nota button.on{color:var(--maize)}
+.t-ruta .st{color:var(--maize-ink)}
 .ruta-share{margin-left:8px;color:var(--orchid);font-weight:700;font-size:13px;text-decoration:underline}
 /* Calculadora de la cuenta */
 .calc{margin-top:12px;border:1.5px solid var(--ink);border-radius:12px;padding:12px;display:grid;gap:10px;font-size:13.5px}
@@ -494,6 +498,10 @@ let RUTA={};
 try{RUTA=JSON.parse(localStorage.getItem('mg26-ruta')||'{}')||{};}catch(e){}
 function setRuta(r,v){if(RUTA[r._slug]===v)delete RUTA[r._slug];else RUTA[r._slug]=v;try{localStorage.setItem('mg26-ruta',JSON.stringify(RUTA));}catch(e){}if(RUTA[r._slug])track('ruta-'+(v==='q'?'quiero':'fui')+'/'+r._slug,r.n);}
 const rutaN=()=>Object.keys(RUTA).length;
+// nota personal de 1 a 5 para los que ya visitó (alimenta "Mi top")
+let NOTAS={};
+try{NOTAS=JSON.parse(localStorage.getItem('mg26-notas')||'{}')||{};}catch(e){}
+function setNota(r,n){NOTAS[r._slug]=n;try{localStorage.setItem('mg26-notas',JSON.stringify(NOTAS));}catch(e){}}
 // ---------- Ubicación (opcional, solo en el navegador del usuario) ----------
 let ME=null;
 const toRad=x=>x*Math.PI/180;
@@ -630,7 +638,7 @@ function card(r){
     <span class="body">
       <span class="name-row"><span class="name">${esc(r.n)}</span><span class="score"><b>${r._score.toFixed(1)}</b><small>pts</small></span></span>
       <span class="meta"><span>${esc(r.zs.join(' · ')||'—')}</span><span>${esc(r.ts.join(', '))}</span></span>
-      <span class="tags">${RUTA[r._slug]?`<span class="tag t-ruta">${RUTA[r._slug]==='f'?'✓ Ya fuiste':'♡ Quieres ir'}</span>`:''}${ME&&isFinite(r._d)?`<span class="tag t-near">📍 ${kmTxt(r._d)}</span>`:''}${cardOpen(r)}${nv}${g}${save}${r.hot?'<span class="tag t-hot">🔥 Muy solicitado</span>':''}${r.el?`<span class="tag t-el">🍽️ ${elTxt(r)}</span>`:''}${deb}</span>
+      <span class="tags">${RUTA[r._slug]?`<span class="tag t-ruta">${RUTA[r._slug]==='f'?`✓ Ya fuiste${NOTAS[r._slug]?` <span class="st">${'★'.repeat(NOTAS[r._slug])}</span>`:''}`:'♡ Quieres ir'}</span>`:''}${ME&&isFinite(r._d)?`<span class="tag t-near">📍 ${kmTxt(r._d)}</span>`:''}${cardOpen(r)}${nv}${g}${save}${r.hot?'<span class="tag t-hot">🔥 Muy solicitado</span>':''}${r.el?`<span class="tag t-el">🍽️ ${elTxt(r)}</span>`:''}${deb}</span>
       <span class="prices">${r.ps.map(p=>`<span class="price${p===209000?' wine':''}">${k(p)}</span>`).join('')}<span class="np">${r.np} platos</span></span>
     </span></button>`;
 }
@@ -638,7 +646,7 @@ function render(){
   current=filtered();
   const n=current.length;
   document.getElementById('count').textContent=`${n} de ${R.length} restaurantes${S.near&&ME?' · los más cercanos primero':S.nv?' · los más recientes primero':S.sort==='score'?' · ordenados por puntaje':''}`;
-  document.getElementById('listTitle').innerHTML=S.ruta?`Mi ruta${n?'<button class="ruta-share" type="button" id="rutaShare">Compartir</button>':''}`:S.lista?'Ruta compartida':S.nv?'Lugares nuevos':(S.q||S.price||S.deb||S.sg||S.open||S.el||S.zonas.size||S.tipos.size)?'Tu selección':'El ranking';
+  document.getElementById('listTitle').innerHTML=S.ruta?`Mi ruta${n?'<button class="ruta-share" type="button" id="rutaShare">Compartir</button><button class="ruta-share" type="button" id="miTop">🏆 Mi top</button>':''}`:S.lista?'Ruta compartida':S.nv?'Lugares nuevos':(S.q||S.price||S.deb||S.sg||S.open||S.el||S.zonas.size||S.tipos.size)?'Tu selección':'El ranking';
   grid.innerHTML=n?current.map(card).join(''):`<div class="empty"><strong>Nada por aquí</strong>Ningún restaurante cumple todos los filtros.<br><button type="button" id="resetAll">Quitar filtros</button></div>`;
   // en modo descubre el orden es fijo (más recientes primero)
   document.getElementById('sortWrap').hidden=!!(S.nv||S.near);
@@ -733,7 +741,7 @@ function openDetail(r,shared){
       <p class="why">${whyHtml(r)}</p>
       <div class="meta"><span>${esc(r.zs.join(' · '))}</span><span>${esc(r.ts.join(', '))}</span></div>
       <div class="tags">${r.nv===1?`<span class="tag t-nv">✨ ${apTxt(r.ap)||'Lugar nuevo'}</span>`:''}${r.deb?'<span class="tag t-deb">🆕 Debut en el festival</span>':''}${r.sg?'<span class="tag t-sg">🌱 Por descubrir · sin reseñas en Google</span>':''}</div>
-      <div class="ruta-row" id="rutaRow">${rutaBtns(r)}</div>
+      <div id="rutaRow">${rutaBtns(r)}</div>
     </div>
     <div class="kpis">
       <div class="kpi"><b>${r.rg>0?'★ '+r.rg.toFixed(1):'—'}</b><span>${r.rg>0?r.nrg.toLocaleString('es-CO')+' reseñas Google':'sin reseñas Google'}</span></div>
@@ -814,8 +822,9 @@ function whyHtml(r){
   if(!pos.length&&!neg.length)return'Equilibrado: sin puntos muy altos ni muy bajos.';
   return`${pos.length?`<span class="pos">Destaca: ${pos.join(' · ')}.</span> `:''}${neg.length?`<span class="neg">Le resta: ${neg.join(' · ')}.</span>`:''}`;
 }
-function rutaBtns(r){const v=RUTA[r._slug];
-  return`<button class="ruta-btn" type="button" data-ruta="q" aria-pressed="${v==='q'}">♡ Quiero ir</button><button class="ruta-btn" type="button" data-ruta="f" aria-pressed="${v==='f'}">✓ Ya fui</button>`;}
+function rutaBtns(r){const v=RUTA[r._slug],nt=NOTAS[r._slug]||0;
+  return`<div class="ruta-row"><button class="ruta-btn" type="button" data-ruta="q" aria-pressed="${v==='q'}">♡ Quiero ir</button><button class="ruta-btn" type="button" data-ruta="f" aria-pressed="${v==='f'}">✓ Ya fui</button></div>`+
+    (v==='f'?`<div class="mi-nota">Tu nota:${[1,2,3,4,5].map(i=>`<button type="button" data-nota="${i}" class="${i<=nt?'on':''}" aria-label="${i} estrella${i>1?'s':''}">★</button>`).join('')}</div>`:'');}
 // ---------- ¿Cuánto paga cada uno? ----------
 // el menú es para dos: con grupos impares se pide un menú más
 const CALC={n:2,tip:true,beb:0};
@@ -858,7 +867,8 @@ dIn.addEventListener('click',e=>{
     window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText(DR)}\n${shareUrl(DR)}`)}`,'_blank','noopener');
   }else if(e.target.closest('[data-share-copy]')){track('copiar-enlace/'+DR._slug,DR.n);copyLink(DR);}
   else if(e.target.closest('[data-ruta]')){const v=e.target.closest('[data-ruta]').dataset.ruta;setRuta(DR,v);document.getElementById('rutaRow').innerHTML=rutaBtns(DR);
-    toast(RUTA[DR._slug]?(v==='q'?'Agregado a tu ruta':'Marcado como visitado'):'Quitado de tu ruta');if(!rutaN())S.ruta=false;renderChips();render();}
+    toast(RUTA[DR._slug]?(v==='q'?'Agregado a tu ruta':'¡Bien! Ponle tu nota para armar tu top'):'Quitado de tu ruta');if(!rutaN())S.ruta=false;renderChips();render();}
+  else if(e.target.closest('[data-nota]')){setNota(DR,+e.target.closest('[data-nota]').dataset.nota);document.getElementById('rutaRow').innerHTML=rutaBtns(DR);track('nota/'+DR._slug,DR.n);render();}
   else if(e.target.closest('[data-cn]')){CALC.n=Math.max(1,Math.min(20,CALC.n+(+e.target.closest('[data-cn]').dataset.cn)));renderCalc();}
   else if(e.target.closest('[data-tip]')){CALC.tip=!CALC.tip;renderCalc();}
   else if(e.target.closest('[data-beb]')){CALC.beb=+e.target.closest('[data-beb]').dataset.beb;renderCalc();}
@@ -974,6 +984,48 @@ document.getElementById('listTitle').addEventListener('click',e=>{
   if(navigator.share)navigator.share({title:'Mi ruta de Medellín Gourmet',text:txt}).catch(()=>{});
   else window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`,'_blank','noopener');
 });
+// ---------- Mi top: imagen vertical (1080×1920) para historias de Instagram y estados de WhatsApp ----------
+document.getElementById('listTitle').addEventListener('click',e=>{if(e.target.id==='miTop')miTop();});
+function fitFont(ctx,text,font,size,maxW){let sz=size;do{ctx.font=`${font.replace('{s}',sz)}`;if(ctx.measureText(text).width<=maxW)break;sz-=2;}while(sz>24);
+  let t=text;if(ctx.measureText(t).width>maxW){while(t.length&&ctx.measureText(t+'…').width>maxW)t=t.slice(0,-1);t+='…';}return t;}
+function rrect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+async function miTop(){
+  const fui=R.filter(r=>RUTA[r._slug]==='f').sort((a,b)=>(NOTAS[b._slug]||0)-(NOTAS[a._slug]||0)||a._rank-b._rank);
+  if(!fui.length){toast('Marca con ✓ Ya fui los restaurantes que visites');return;}
+  try{await document.fonts.ready;}catch(e){}
+  const W=1080,H=1920,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  const F='"Gloock",Georgia,serif',B='"Figtree",system-ui,sans-serif',M='"IBM Plex Mono",monospace';
+  x.fillStyle='#0f3d2e';x.fillRect(0,0,W,H);
+  // orquídea decorativa
+  x.fillStyle='rgba(176,40,122,.35)';x.beginPath();x.arc(W-60,140,260,0,Math.PI*2);x.fill();
+  x.fillStyle='#f2c230';x.font=`600 30px ${M}`;x.fillText('MEDELLÍN GOURMET · OCT 2026',80,150);
+  x.fillStyle='#eaf3ec';x.font=`400 150px ${F}`;x.fillText('Mi top',80,320);
+  x.fillStyle='#f2c230';x.font=`400 86px ${F}`;x.fillText('del festival',80,420);
+  x.fillStyle='#eaf3ec';x.globalAlpha=.85;x.font=`500 40px ${B}`;x.fillText(`Fui a ${fui.length} restaurante${fui.length>1?'s':''}`,80,500);x.globalAlpha=1;
+  const top=fui.slice(0,5),y0=560,ch=180,gap=20;
+  top.forEach((r,i)=>{const y=y0+i*(ch+gap);
+    x.fillStyle='#fbfcf8';rrect(x,80,y,W-160,ch,28);x.fill();
+    x.fillStyle=i===0?'#b0287a':'#14251d';x.font=`400 110px ${F}`;x.textAlign="center";x.fillText(String(i+1),175,y+128);x.textAlign='left';
+    x.strokeStyle='#d9dfd4';x.setLineDash([10,10]);x.lineWidth=3;x.beginPath();x.moveTo(270,y+24);x.lineTo(270,y+ch-24);x.stroke();x.setLineDash([]);
+    x.fillStyle='#14251d';const nm=fitFont(x,r.n,`400 {s}px ${F}`,60,W-160-230);x.fillText(nm,300,y+80);
+    x.fillStyle='#5d6b63';const meta=fitFont(x,[r.zs[0],r.ts[0]].filter(Boolean).join(' · '),`500 {s}px ${B}`,30,W-160-230);x.fillText(meta,300,y+120);
+    const nt=NOTAS[r._slug]||0;x.font=`400 40px ${B}`;x.fillStyle='#f2c230';x.fillText('★'.repeat(nt),300,y+162);x.fillStyle="#d9dfd4";x.fillText("★".repeat(5-nt),300+x.measureText("★".repeat(nt)).width,y+162);
+  });
+  let yf=y0+top.length*(ch+gap)+20;
+  if(fui.length>5){x.fillStyle='#eaf3ec';x.globalAlpha=.8;x.font=`500 36px ${B}`;x.fillText(`+ ${fui.length-5} más en mi ruta`,80,yf+20);x.globalAlpha=1;}
+  x.fillStyle='#eaf3ec';x.globalAlpha=.8;x.font=`500 34px ${B}`;x.fillText('Arma el tuyo en',80,H-210);x.globalAlpha=1;
+  x.fillStyle='#f2c230';x.font=`600 34px ${M}`;x.fillText((location.host+location.pathname).replace(/\/(index\.html)?$/,''),80,H-160);
+  x.fillStyle='#eaf3ec';x.globalAlpha=.6;x.font=`500 26px ${B}`;x.fillText('Ranking independiente y no oficial · Hecho con IA por GECOFIIN',80,H-95);x.globalAlpha=1;
+  c.toBlob(async blob=>{
+    if(!blob){toast('No se pudo crear la imagen');return;}
+    track('mi-top');
+    const file=new File([blob],'mi-top-medellin-gourmet-2026.png',{type:'image/png'});
+    const txt=`🏆 Mi top de Medellín Gourmet 2026. Arma el tuyo: ${location.origin}${location.pathname}`;
+    try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],text:txt});return;}}catch(err){if(err&&err.name==='AbortError')return;}
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=file.name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast('Imagen descargada, súbela a tus historias');
+  },'image/png');
+}
 document.getElementById('sharedClose').addEventListener('click',()=>{S.lista=null;document.getElementById('sharedList').hidden=true;render();});
 document.getElementById('sharedSave').addEventListener('click',()=>{
   R.forEach(r=>{if(S.lista&&S.lista.has(r._slug)&&!RUTA[r._slug])RUTA[r._slug]='q';});

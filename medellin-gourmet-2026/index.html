@@ -347,8 +347,14 @@ dialog.detail .sheet-in{max-height:92dvh}
 .calc-h strong{font:400 19px/1.1 var(--f-display)}
 .stepper{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:99px;overflow:hidden}
 .stepper button{width:36px;height:34px;font-size:18px;font-weight:700}
-.stepper span{min-width:84px;text-align:center;font-weight:700}
+.stepper span{min-width:44px;text-align:center;font-weight:700}
 .calc-opts{display:flex;flex-wrap:wrap;gap:6px}
+.calc-row{display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:600}
+.calc-row small{font-weight:500;color:var(--muted)}
+.calc-reset{font-size:12px;color:var(--orchid);text-decoration:underline;font-weight:600;margin-left:4px}
+.calc-in{display:inline-flex;align-items:center;gap:4px;border:1.5px solid var(--line);border-radius:99px;padding:0 12px;height:36px;font:600 14px var(--f-mono)}
+.calc-in input{width:110px;border:0;background:none;font:inherit;color:inherit;text-align:right;outline:none}
+.calc-in:focus-within{border-color:var(--ink)}
 .calc-opts .chip{height:30px;font-size:12.5px;padding:0 10px}
 .calc-res{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-family:var(--f-mono);font-size:13px}
 .calc-res .tot{font-weight:700;font-size:15px;border-top:1px dashed var(--line);padding-top:6px}
@@ -852,27 +858,36 @@ function rutaBtns(r){const v=RUTA[r._slug],nt=NOTAS[r._slug]||0;
   return`<div class="ruta-row"><button class="ruta-btn" type="button" data-ruta="q" aria-pressed="${v==='q'}">♡ Quiero ir</button><button class="ruta-btn" type="button" data-ruta="f" aria-pressed="${v==='f'}">✓ Ya fui</button></div>`+
     (v==='f'?`<div class="mi-nota">Tu nota:${[1,2,3,4,5].map(i=>`<button type="button" data-nota="${i}" class="${i<=nt?'on':''}" aria-label="${i} estrella${i>1?'s':''}">★</button>`).join('')}</div>`:'');}
 // ---------- ¿Cuánto paga cada uno? ----------
-// el menú es para dos: con grupos impares se pide un menú más
-const CALC={n:2,tip:true,beb:0};
+// el menú es para dos: se sugiere un menú por cada dos personas, pero se puede ajustar a mano
+// (p. ej. van tres y piden un solo menú); "extra" es el valor total de lo adicional en pesos
+const CALC={n:2,tip:true,menus:null,extra:0};
+const menusSug=()=>Math.ceil(CALC.n/2);
 function calcNums(){
-  const menus=Math.ceil(CALC.n/2),base=menus*DM,beb=CALC.beb*CALC.n,tip=CALC.tip?Math.round((base+beb)*0.1/100)*100:0,tot=base+beb+tip;
-  return{menus,base,beb,tip,tot,pp:Math.ceil(tot/CALC.n/100)*100};
+  const menus=CALC.menus??menusSug(),base=menus*DM,extra=CALC.extra,tip=CALC.tip?Math.round((base+extra)*0.1/100)*100:0,tot=base+extra+tip;
+  return{menus,base,extra,tip,tot,pp:Math.ceil(tot/CALC.n/100)*100};
 }
 function renderCalc(){
   const el=document.getElementById('calc');if(!el||!DR)return;
   const c=calcNums();
-  el.innerHTML=`<div class="calc-h"><strong>🧮 ¿Cuánto paga cada uno?</strong>
-    <span class="stepper"><button type="button" data-cn="-1" aria-label="Menos personas">−</button><span>${CALC.n} persona${CALC.n>1?'s':''}</span><button type="button" data-cn="1" aria-label="Más personas">+</button></span></div>
-    <div class="calc-opts"><button class="chip" type="button" data-tip aria-pressed="${CALC.tip}">Servicio 10%</button>
-    ${[[0,'Sin bebidas extra'],[15000,'+ bebida $15K c/u'],[30000,'+ bebidas $30K c/u']].map(([v,l])=>`<button class="chip" type="button" data-beb="${v}" aria-pressed="${CALC.beb===v}">${l}</button>`).join('')}</div>
-    <div class="calc-res"><span>${c.menus} menú${c.menus>1?'s':''} de ${k(DM)}</span><span>${fmt(c.base)}</span>
-    ${c.beb?`<span>Bebidas extra</span><span>${fmt(c.beb)}</span>`:''}${c.tip?`<span>Servicio voluntario</span><span>${fmt(c.tip)}</span>`:''}
+  el.innerHTML=`<div class="calc-h"><strong>🧮 ¿Cuánto paga cada uno?</strong></div>
+    <div class="calc-row"><span>Personas</span><span class="stepper"><button type="button" data-cn="-1" aria-label="Menos personas">−</button><span>${CALC.n}</span><button type="button" data-cn="1" aria-label="Más personas">+</button></span></div>
+    <div class="calc-row"><span>Menús de ${k(DM)}${CALC.menus!=null&&CALC.menus!==menusSug()?` <button type="button" class="calc-reset" data-cm-reset>usar ${menusSug()}</button>`:''}</span><span class="stepper"><button type="button" data-cm="-1" aria-label="Menos menús">−</button><span>${c.menus}</span><button type="button" data-cm="1" aria-label="Más menús">+</button></span></div>
+    <label class="calc-row" for="calcExtra"><span>Adicionales <small>(bebidas, postres…)</small></span><span class="calc-in">$<input id="calcExtra" type="text" inputmode="numeric" autocomplete="off" placeholder="0" value="${CALC.extra?CALC.extra.toLocaleString('es-CO'):''}"></span></label>
+    <div class="calc-opts"><button class="chip" type="button" data-tip aria-pressed="${CALC.tip}">Servicio 10%</button></div>
+    <div id="calcOut">${calcOut()}</div>`;
+}
+// solo se repinta el resultado al escribir, para no perder el foco del campo
+function calcOut(){const c=calcNums();
+  return`<div class="calc-res"><span>${c.menus} menú${c.menus!==1?'s':''} de ${k(DM)}</span><span>${fmt(c.base)}</span>
+    ${c.extra?`<span>Adicionales</span><span>${fmt(c.extra)}</span>`:''}${c.tip?`<span>Servicio voluntario 10%</span><span>${fmt(c.tip)}</span>`:''}
     <span class="tot">Total</span><span class="tot">${fmt(c.tot)}</span></div>
     <div class="calc-pp"><span>A cada uno le toca <b>${fmt(c.pp)}</b></span>${CALC.n>1?'<button type="button" data-calc-send>Enviar al grupo</button>':''}</div>
-    ${CALC.n%2?`<div class="note">El menú es para dos: ${CALC.n===1?'si vas solo, pregunta si hay porción individual':'con grupo impar se calcula un menú más'}.</div>`:''}`;
-}
+    ${CALC.n===1&&c.menus===1?'<div class="note">El menú es para dos: si vas solo, pregunta si hay porción individual.</div>':''}`;}
 function calcText(r){const c=calcNums();
-  return`🧮 Cuenta para ${CALC.n} en *${r.n}* (Medellín Gourmet)\n${c.menus} menú${c.menus>1?'s':''} de ${fmt(DM)}${c.beb?` + bebidas ${fmt(c.beb)}`:''}${c.tip?` + servicio ${fmt(c.tip)}`:''}\nTotal ${fmt(c.tot)} → *${fmt(c.pp)} cada uno*\n${shareUrl(r)}`;}
+  return`🧮 Cuenta para ${CALC.n} en *${r.n}* (Medellín Gourmet)\n${c.menus} menú${c.menus!==1?'s':''} de ${fmt(DM)}${c.extra?` + adicionales ${fmt(c.extra)}`:''}${c.tip?` + servicio ${fmt(c.tip)}`:''}\nTotal ${fmt(c.tot)} → *${fmt(c.pp)} cada uno*\n${shareUrl(r)}`;}
+dIn.addEventListener('input',e=>{if(e.target.id!=='calcExtra')return;
+  CALC.extra=+(e.target.value.replace(/\D/g,'').slice(0,9))||0;document.getElementById('calcOut').innerHTML=calcOut();});
+dIn.addEventListener('focusout',e=>{if(e.target.id==='calcExtra')e.target.value=CALC.extra?CALC.extra.toLocaleString('es-CO'):'';});
 function reportUrl(r){
   const t=`Hola, en el ranking de Medellín Gourmet hay un dato por corregir en ${r.n}: `;
   return REPORTE_URL.startsWith('mailto:')?`${REPORTE_URL}?subject=${encodeURIComponent('Corrección: '+r.n)}&body=${encodeURIComponent(t)}`:REPORTE_URL.includes('wa.me')?`${REPORTE_URL}?text=${encodeURIComponent(t)}`:REPORTE_URL;
@@ -896,8 +911,9 @@ dIn.addEventListener('click',e=>{
     toast(RUTA[DR._slug]?(v==='q'?'Agregado a tu ruta':'¡Bien! Ponle tu nota para armar tu top'):'Quitado de tu ruta');if(!rutaN())S.ruta=false;renderChips();render();}
   else if(e.target.closest('[data-nota]')){setNota(DR,+e.target.closest('[data-nota]').dataset.nota);document.getElementById('rutaRow').innerHTML=rutaBtns(DR);track(`nota/${NOTAS[DR._slug]}/${DR._slug}`,`${DR.n} · ${NOTAS[DR._slug]}★`);render();}
   else if(e.target.closest('[data-cn]')){CALC.n=Math.max(1,Math.min(20,CALC.n+(+e.target.closest('[data-cn]').dataset.cn)));renderCalc();}
+  else if(e.target.closest('[data-cm]')){CALC.menus=Math.max(1,Math.min(20,calcNums().menus+(+e.target.closest('[data-cm]').dataset.cm)));renderCalc();}
+  else if(e.target.closest('[data-cm-reset]')){CALC.menus=null;renderCalc();}
   else if(e.target.closest('[data-tip]')){CALC.tip=!CALC.tip;renderCalc();}
-  else if(e.target.closest('[data-beb]')){CALC.beb=+e.target.closest('[data-beb]').dataset.beb;renderCalc();}
   else if(e.target.closest('[data-calc-send]')){track('calculadora/'+DR._slug,DR.n);
     window.open(`https://wa.me/?text=${encodeURIComponent(calcText(DR))}`,'_blank','noopener');}
 });

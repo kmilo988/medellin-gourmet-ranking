@@ -146,11 +146,16 @@ a{color:inherit}
 .now-item h4{font:400 21px/1.15 var(--f-display);display:flex;gap:8px;align-items:baseline}
 .now-item h4 .mono{font-size:13px;color:var(--orchid)}
 .now-meta{display:flex;flex-wrap:wrap;gap:6px}
-.now-acts{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px}
-.now-acts a,.now-acts button{display:flex;align-items:center;justify-content:center;height:42px;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none}
+.now-acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px}
+.now-acts a,.now-acts button{display:flex;align-items:center;justify-content:center;gap:6px;height:42px;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none}
 .now-acts .see{background:var(--ink);color:var(--bg)}
-.now-acts .gm{background:var(--forest);color:var(--forest-ink)}
-.now-acts .wz{background:#33ccff;color:#06283d}
+.now-acts .tel{border:1.5px solid var(--ink)}
+.now-acts .wa{background:#1f9d55;color:#fff}
+.now-price{font-size:1rem;line-height:1.35}
+.now-price small{display:block;font-size:.875rem;color:var(--muted)}
+.now-hot{font-size:.875rem;font-weight:700;color:#9a3412}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .now-hot{color:#fdba74}}
+:root[data-theme="dark"] .now-hot{color:#fdba74}
 .now-more{margin-top:14px;color:var(--orchid);font-weight:700;text-decoration:underline}
 .now-empty{padding:18px 0;color:var(--muted)}
 /* Horario y consejos en el detalle */
@@ -179,6 +184,8 @@ a{color:inherit}
 .nav a{display:flex;align-items:center;justify-content:center;gap:6px;height:42px;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none}
 .nav .gm{background:var(--forest);color:var(--forest-ink)}
 .nav .wz{background:#33ccff;color:#06283d}
+.nav.n3{grid-template-columns:1fr 1fr 1fr}
+.nav .ub{background:#000;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
 .loc-ask{font:600 12.5px/1.2 var(--f-body);color:var(--orchid);text-decoration:underline;justify-self:start}
 
 /* ---------- Lista ---------- */
@@ -355,6 +362,11 @@ dialog.detail .sheet-in{max-height:92dvh}
 .top-cut{font:600 11px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:center;padding:6px 0}
 .top-help{font-size:13px;color:var(--muted);margin-top:4px}
 .ruta-share{margin-left:8px;color:var(--orchid);font-weight:700;font-size:13px;text-decoration:underline}
+/* aviso de respaldo pendiente en Mi ruta */
+.bk-warn{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin:-4px 0 12px;padding:8px 12px;border-radius:10px;background:var(--maize-soft);color:var(--maize-ink);font-size:.875rem}
+.bk-warn button{color:inherit;font-weight:700;text-decoration:underline}
+.top-bk{margin-top:10px;font-size:.875rem;color:var(--muted)}
+.top-bk .ruta-share{margin-left:4px}
 /* Calculadora de la cuenta */
 .calc{margin-top:12px;border:1.5px solid var(--ink);border-radius:12px;padding:12px;display:grid;gap:10px;font-size:13.5px}
 .calc-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
@@ -397,6 +409,8 @@ dialog.detail .sheet-in{max-height:92dvh}
 .foot b{color:var(--ink);font-weight:600}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
   background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-weight:600;font-size:13.5px;z-index:99}
+.toast.undo{display:flex;align-items:center;gap:12px;width:max-content;max-width:calc(100vw - 32px)}
+.toast.undo button{color:inherit;font-weight:800;text-decoration:underline}
 </style>
 </head>
 <body>
@@ -465,6 +479,7 @@ dialog.detail .sheet-in{max-height:92dvh}
         <option value="mg">reseñas en el festival</option>
       </select></p>
   </div>
+  <div class="bk-warn" id="bkWarn" hidden></div>
   <div class="grid" id="grid"></div>
   <footer class="foot">
     <div><b>Cómo se calcula el puntaje.</b> Google 40% · Ahorro 25% · Popularidad en Google 15% · Variedad de platos 15% · Extras del local 5%.</div>
@@ -551,6 +566,13 @@ function setNota(r,n){NOTAS[r._slug]=n;try{localStorage.setItem('mg26-notas',JSO
 let ORDEN=[];
 try{ORDEN=JSON.parse(localStorage.getItem('mg26-orden')||'[]')||[];}catch(e){}
 function saveOrden(){try{localStorage.setItem('mg26-orden',JSON.stringify(ORDEN));}catch(e){}}
+// respaldo: se guarda el código de la última copia para contar los cambios que aún no tienen respaldo
+function bkCode(){const ord=topList().map(r=>r._slug),rest=R.filter(r=>RUTA[r._slug]==='q').map(r=>r._slug);
+  return[...ord,...rest].map(sl=>sl+'.'+(RUTA[sl]==='f'?'f'+(NOTAS[sl]||0):'q')).join(',');}
+function bkMark(){try{localStorage.setItem('mg26-respaldo',JSON.stringify({t:Date.now(),code:bkCode()}));}catch(e){}}
+function bkPending(){let old='';try{old=(JSON.parse(localStorage.getItem('mg26-respaldo')||'{}')||{}).code||'';}catch(e){}
+  const m=c=>new Map(c?c.split(',').map(it=>it.split('.')):[]),a=m(old),b=m(bkCode());
+  let n=0;new Set([...a.keys(),...b.keys()]).forEach(sl=>{if(a.get(sl)!==b.get(sl))n++;});return n;}
 function topList(){
   const fui=R.filter(r=>RUTA[r._slug]==='f');
   const pos=new Map(ORDEN.map((sl,i)=>[sl,i]));
@@ -726,6 +748,9 @@ function render(){
   document.getElementById('count').textContent=`${n} de ${R.length} restaurantes${S.near&&ME?' · los más cercanos primero':S.nv?' · los más recientes primero':S.sort==='score'?' · ordenados por puntaje':''}`;
   document.getElementById('listTitle').innerHTML=S.ruta?`Mi ruta${n?'<button class="ruta-share" type="button" id="rutaShare">Compartir</button><button class="ruta-share" type="button" id="miTop">🏆 Mi top</button><button class="ruta-share" type="button" id="rutaBackup">Guardar copia</button>':''}`:S.lista?'Ruta compartida':S.nv?'Lugares nuevos':(S.q||S.price||S.deb||S.sg||S.open||S.el||S.veg||S.park||S.dia!=null||S.zonas.size||S.tipos.size)?'Tu selección':'El ranking';
   grid.innerHTML=n?current.map(card).join(''):`<div class="empty"><strong>Nada por aquí</strong>Ningún restaurante cumple todos los filtros.<br><button type="button" id="resetAll">Quitar filtros</button></div>`;
+  // en Mi ruta: aviso discreto si hay cambios sin respaldar
+  const bw=document.getElementById('bkWarn'),bn=S.ruta&&n?bkPending():0;
+  bw.hidden=!bn;if(bn)bw.innerHTML=`💾 Tienes ${bn} cambio${bn>1?'s':''} sin respaldar ·<button type="button" id="bkGo">Guardar copia</button>`;
   // en modo descubre el orden es fijo (más recientes primero)
   document.getElementById('sortWrap').hidden=!!(S.nv||S.near);
   // cuenta lo que se elige en la hoja de filtros
@@ -999,8 +1024,12 @@ dIn.addEventListener('click',e=>{
     e.preventDefault();track('compartir-wa/'+DR._slug,DR.n);
     window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText(DR)}\n${shareUrl(DR)}`)}`,'_blank','noopener');
   }else if(e.target.closest('[data-share-copy]')){track('copiar-enlace/'+DR._slug,DR.n);copyLink(DR);}
-  else if(e.target.closest('[data-ruta]')){const v=e.target.closest('[data-ruta]').dataset.ruta;setRuta(DR,v);document.getElementById('rutaRow').innerHTML=rutaBtns(DR);
-    toast(RUTA[DR._slug]?(v==='q'?'Agregado a tu ruta':'¡Bien! Ponle tu nota para armar tu top'):'Quitado de tu ruta');if(!rutaN())S.ruta=false;renderChips();render();}
+  else if(e.target.closest('[data-ruta]')){const v=e.target.closest('[data-ruta]').dataset.ruta,r=DR,prev=RUTA[r._slug],nt=NOTAS[r._slug],wasRuta=S.ruta;
+    setRuta(r,v);const redo=()=>{if(DR===r)document.getElementById('rutaRow').innerHTML=rutaBtns(r);if(!rutaN())S.ruta=false;renderChips();render();};redo();
+    // quitar "Ya fui" a uno con nota: se puede deshacer para no perderla por error
+    if(prev==='f'&&nt&&RUTA[r._slug]!=='f'){track('ya-fui-quitado/'+r._slug,r.n);
+      toastUndo(`Quitaste "Ya fui" (${'★'.repeat(nt)})`,()=>{RUTA[r._slug]='f';NOTAS[r._slug]=nt;try{localStorage.setItem('mg26-ruta',JSON.stringify(RUTA));}catch(e){}S.ruta=wasRuta;track('ya-fui-deshacer/'+r._slug,r.n);redo();});}
+    else toast(RUTA[r._slug]?(v==='q'?'Agregado a tu ruta':'¡Bien! Ponle tu nota para armar tu top'):'Quitado de tu ruta');}
   else if(e.target.closest('[data-nota]')){setNota(DR,+e.target.closest('[data-nota]').dataset.nota);document.getElementById('rutaRow').innerHTML=rutaBtns(DR);track(`nota/${NOTAS[DR._slug]}/${DR._slug}`,`${DR.n} · ${NOTAS[DR._slug]}★`);render();}
   else if(e.target.closest('[data-cn]')){CALC.n=Math.max(1,Math.min(20,CALC.n+(+e.target.closest('[data-cn]').dataset.cn)));renderCalc();}
   else if(e.target.closest('[data-cm]')){const b=e.target.closest('[data-cm]'),p=+b.dataset.p;
@@ -1010,15 +1039,18 @@ dIn.addEventListener('click',e=>{
   else if(e.target.closest('[data-calc-send]')){track('calculadora/'+DR._slug,DR.n);
     window.open(`https://wa.me/?text=${encodeURIComponent(calcText(DR))}`,'_blank','noopener');}
 });
+// Uber necesita coordenadas: recoge en la ubicación actual y deja en la sede
+function uberUrl(r,x){return x&&x.lat!=null?`https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[latitude]=${x.lat}&dropoff[longitude]=${x.lng}&dropoff[nickname]=${encodeURIComponent(r.n)}`:'';}
 // enlaces de navegación: con coordenadas validadas o, si no, por dirección escrita
 function sedeHtml(r,x,closest){
   const q=encodeURIComponent(`${r.n} ${x.dir}`);
   const gm=x.lat!=null?`https://www.google.com/maps/dir/?api=1&destination=${x.lat},${x.lng}`:`https://www.google.com/maps/search/?api=1&query=${q}`;
   const wz=x.lat!=null?`https://waze.com/ul?ll=${x.lat},${x.lng}&navigate=yes`:`https://waze.com/ul?q=${encodeURIComponent(x.dir)}&navigate=yes`;
+  const ub=uberUrl(r,x);
   return`<div class="sede${closest?' closest':''}">
     <div class="sede-h"><b>${closest?'⭐ ':''}${esc(x.nm||'Sede')}</b>${x.d!=null?`<span class="km">${kmTxt(x.d)}</span>`:''}</div>
     <div class="sede-dir">${esc(x.dir)}</div>
-    <div class="nav"><a class="gm" href="${gm}" target="_blank" rel="noopener" data-ev="como-llegar/${esc(r._slug)}">Google Maps</a><a class="wz" href="${wz}" target="_blank" rel="noopener" data-ev="como-llegar/${esc(r._slug)}">Waze</a></div>
+    <div class="nav${ub?' n3':''}"><a class="gm" href="${gm}" target="_blank" rel="noopener" data-ev="como-llegar/${esc(r._slug)}">${ub?'Maps':'Google Maps'}</a><a class="wz" href="${wz}" target="_blank" rel="noopener" data-ev="como-llegar/${esc(r._slug)}">Waze</a>${ub?`<a class="ub" href="${esc(ub)}" target="_blank" rel="noopener" data-ev="uber/${esc(r._slug)}">Uber</a>`:''}</div>
   </div>`;
 }
 dIn.addEventListener('click',e=>{
@@ -1028,7 +1060,11 @@ dIn.addEventListener('click',e=>{
   try{navigator.clipboard.writeText(v).then(done,()=>selectText(c.previousElementSibling));}catch(err){selectText(c.previousElementSibling);}
 });
 function selectText(el){const rg=document.createRange();rg.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(rg);toast('Selecciona y copia el número');}
-function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),1800);}
+const toastHost=()=>[...document.querySelectorAll('dialog[open]')].pop()||document.body;
+function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;toastHost().appendChild(d);setTimeout(()=>d.remove(),1800);}
+function toastUndo(t,undo){document.querySelectorAll('.toast.undo').forEach(x=>x.remove());
+  const d=document.createElement('div');d.className='toast undo';d.innerHTML=`<span>${esc(t)}</span><button type="button">Deshacer</button>`;
+  d.querySelector('button').addEventListener('click',()=>{d.remove();undo();});toastHost().appendChild(d);setTimeout(()=>d.remove(),6000);}
 
 // cerrar hojas: botón, clic fuera o Esc (nativo)
 document.querySelectorAll('dialog').forEach(d=>{
@@ -1078,9 +1114,13 @@ function showNow(){
     h+=top.map((x,i)=>{const r=x.r,sd=(r.sd||[])[r._near>=0?r._near:0]||{lat:r.lat,lng:r.lng,dir:r.dir};
       const gm=sd.lat!=null?`https://www.google.com/maps/dir/?api=1&destination=${sd.lat},${sd.lng}`:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.n+' '+(sd.dir||''))}`;
       const wz=sd.lat!=null?`https://waze.com/ul?ll=${sd.lat},${sd.lng}&navigate=yes`:`https://waze.com/ul?q=${encodeURIComponent(sd.dir||r.n)}&navigate=yes`;
+      const ub=uberUrl(r,sd),tel=callNum(r),ps=r.mn.length?r.mn.map(m=>m.p):r.ps,lo=Math.min(...ps),tot=lo+Math.round(lo*0.1/100)*100;
       return`<div class="now-item"><h4><span class="mono">${i+1}</span>${esc(r.n)}</h4>
         <div class="now-meta">${ME&&isFinite(r._d)?`<span class="tag t-near">📍 ${kmTxt(r._d)}</span>`:''}<span class="tag t-open">🕒 Hasta ${hhmm(x.st.closes)}</span>${r.rg>0?`<span class="tag t-g">★ ${r.rg.toFixed(1)}</span>`:''}${r.ah>0?`<span class="tag t-save">−${Math.round(r.ah)}%</span>`:''}${r.hot?'<span class="tag t-hot">🔥 Reserva</span>':''}</div>
-        <div class="now-acts"><button class="see" type="button" data-see="${r._id}">Ver menú</button><a class="gm" href="${gm}" target="_blank" rel="noopener">Maps</a><a class="wz" href="${wz}" target="_blank" rel="noopener">Waze</a></div></div>`;}).join('');
+        <div class="now-price">💵 Menú desde <b class="mono">${k(lo)}</b> → <b class="mono">${fmt(tot)}</b> los dos<small>con servicio del 10 %${ps.length>1?` · ${ps.length} menús`:''}</small></div>
+        ${r.hot?'<div class="now-hot">📞 Llama antes: suele estar lleno</div>':''}
+        <div class="now-acts"><button class="see" type="button" data-see="${r._id}">Ver menú</button>${tel?`<a class="tel" href="tel:${tel}" data-ev="llamar/${esc(r._slug)}">📞 Llamar</a>`:''}${r.wa?`<a class="wa" href="${esc(r.wa)}" target="_blank" rel="noopener" data-ev="restaurante-wa/${esc(r._slug)}">WhatsApp</a>`:''}</div>
+        <div class="nav${ub?' n3':''}"><a class="gm" href="${gm}" target="_blank" rel="noopener" data-ev="ahora-maps/${esc(r._slug)}">Maps</a><a class="wz" href="${wz}" target="_blank" rel="noopener" data-ev="ahora-waze/${esc(r._slug)}">Waze</a>${ub?`<a class="ub" href="${esc(ub)}" target="_blank" rel="noopener" data-ev="uber/${esc(r._slug)}">Uber</a>`:''}</div></div>`;}).join('');
     h+=`<button class="now-more" type="button" id="nowAll">Ver todos los abiertos${ME?' cerca de mí':''}</button>`;
   }
   nowIn.innerHTML=h;
@@ -1133,7 +1173,8 @@ function openTop(){
     h+=`<div class="top-it${i<5?' in':''}"><span class="n">${i+1}</span><span><b>${esc(r.n)}</b><small>${NOTAS[r._slug]?'★'.repeat(NOTAS[r._slug]):'sin nota'}</small></span>
       <span class="top-mv"><button type="button" data-mv="-1" data-i="${i}" aria-label="Subir" ${i===0?'disabled':''}>↑</button><button type="button" data-mv="1" data-i="${i}" aria-label="Bajar" ${i===L.length-1?'disabled':''}>↓</button></span></div>`;
   });
-  h+=`</div><div class="f-foot"><button class="f-reset" type="button" id="topReset">Ordenar por estrellas</button><button class="f-apply" type="button" id="topGo">Crear imagen</button></div>`;
+  h+=`</div><p class="top-bk">¿Cambias de celular o borras el navegador?<button class="ruta-share" type="button" id="topBackup">Guardar copia</button></p>
+    <div class="f-foot"><button class="f-reset" type="button" id="topReset">Ordenar por estrellas</button><button class="f-apply" type="button" id="topGo">Crear imagen</button></div>`;
   topIn.innerHTML=h;
   if(!topDlg.open)topDlg.showModal();
 }
@@ -1142,18 +1183,20 @@ topIn.addEventListener('click',e=>{
   if(b){const L=topList().map(r=>r._slug),i=+b.dataset.i,j=i+(+b.dataset.mv);
     if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];ORDEN=L;saveOrden();const st=topIn.scrollTop;openTop();topIn.scrollTop=st;return;}
   if(e.target.id==='topReset'){ORDEN=[];saveOrden();openTop();return;}
+  if(e.target.id==='topBackup'){ORDEN=topList().map(r=>r._slug);saveOrden();backupRuta('top');return;}
   if(e.target.id==='topGo'){ORDEN=topList().map(r=>r._slug);saveOrden();topDlg.close();miTop();}
 });
 // respaldo: un enlace que guarda ruta, notas y orden; al abrirlo en cualquier celular se recupera todo
-function backupRuta(){
-  const ord=topList().map(r=>r._slug),rest=R.filter(r=>RUTA[r._slug]==='q').map(r=>r._slug);
-  const code=[...ord,...rest].map(sl=>sl+'.'+(RUTA[sl]==='f'?'f'+(NOTAS[sl]||0):'q')).join(',');
-  const url=`${location.origin}${location.pathname}?respaldo=${code}`;
+function backupRuta(from){
+  const url=`${location.origin}${location.pathname}?respaldo=${bkCode()}`;
   const txt=`📌 Mi respaldo de Medellín Gourmet 2026. Abre este enlace en cualquier celular para recuperar mi ruta y mi top:\n${url}`;
-  track('guardar-copia');
-  if(navigator.share)navigator.share({title:'Mi respaldo de Medellín Gourmet',text:txt}).catch(()=>{});
-  else{try{navigator.clipboard.writeText(txt).then(()=>toast('Enlace copiado: guárdalo en tu chat de WhatsApp contigo mismo'),()=>toast('No se pudo copiar'));}catch(e){toast('No se pudo copiar');}}
+  track('guardar-copia'+(from?'/'+from:''));
+  // solo cuenta como respaldo si se compartió o copió de verdad
+  const ok=()=>{bkMark();render();};
+  if(navigator.share)navigator.share({title:'Mi respaldo de Medellín Gourmet',text:txt}).then(ok,()=>{});
+  else{try{navigator.clipboard.writeText(txt).then(()=>{ok();toast('Enlace copiado: guárdalo en tu chat de WhatsApp contigo mismo');},()=>toast('No se pudo copiar'));}catch(e){toast('No se pudo copiar');}}
 }
+document.getElementById('bkWarn').addEventListener('click',e=>{if(e.target.id==='bkGo')backupRuta('aviso');});
 function fitFont(ctx,text,font,size,maxW){let sz=size;do{ctx.font=`${font.replace('{s}',sz)}`;if(ctx.measureText(text).width<=maxW)break;sz-=2;}while(sz>24);
   let t=text;if(ctx.measureText(t).width>maxW){while(t.length&&ctx.measureText(t+'…').width>maxW)t=t.slice(0,-1);t+='…';}return t;}
 function rrect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
@@ -1211,7 +1254,7 @@ document.getElementById('sharedSave').addEventListener('click',()=>{
     resp.split(',').forEach(it=>{const[sl,v]=it.split('.');if(!sl||!v||!R.some(r=>r._slug===sl))return;n++;
       if(v[0]==='f'){RUTA[sl]='f';ord.push(sl);const nt=+v.slice(1);if(nt>=1&&nt<=5)NOTAS[sl]=nt;}else RUTA[sl]='q';});
     if(n){ORDEN=ord;saveOrden();try{localStorage.setItem('mg26-ruta',JSON.stringify(RUTA));localStorage.setItem('mg26-notas',JSON.stringify(NOTAS));}catch(e){}
-      S.ruta=true;track('recupera-respaldo');toast(`Recuperamos tu ruta: ${n} restaurante${n>1?'s':''}`);renderChips();render();}
+      bkMark();S.ruta=true;track('recupera-respaldo');toast(`Recuperamos tu ruta: ${n} restaurante${n>1?'s':''}`);renderChips();render();}
     try{history.replaceState(null,'',location.pathname);}catch(e){}
     return;
   }
